@@ -1,39 +1,16 @@
-/**
- * Cloudflare Worker – AWS Architecture Challenge API
- *
- * Handles anonymous player entry creation, challenge assignment, and
- * session state retrieval. Persists all data in Cloudflare KV.
- *
- * Routes
- * ------
- * GET  /api/session              – Return current GameConfig + RoundState
- * POST /api/join                 – Create a new PlayerEntry, assign challenge
- * GET  /api/entry/:entryId       – Fetch an existing PlayerEntry (re-entry)
- *
- * KV Keys
- * -------
- * session:config   → GameConfig JSON
- * session:state    → RoundState string
- * session:counter  → integer string, incremented per new entry (round-robin)
- * entry:{entryId}  → PlayerEntry JSON
- */
-
+import { nanoid } from "nanoid";
+import { loadGameContent, assignChallenge } from "../content/seed/index";
 import type {
-  GameConfig,
   PlayerEntry,
+  ChallengeCard,
+  GameConfig,
   RoundState,
   HintTier,
 } from "../content/schema/types";
 
-// ---------------------------------------------------------------------------
-// Environment bindings
-// ---------------------------------------------------------------------------
-
 export interface Env {
   GAME_KV: KVNamespace;
-  DEFAULT_CHALLENGE_POOL: string;
-  DEFAULT_MODE: string;
-  DEFAULT_ASSIGNMENT_STRATEGY: string;
+  ASSETS: Fetcher;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,233 +19,217 @@ export interface Env {
 
 const KV_SESSION_CONFIG = "session:config";
 const KV_SESSION_STATE = "session:state";
-const KV_SESSION_COUNTER = "session:counter";
-const entryKey = (id: string) => `entry:${id}`;
+const KV_SESSION_ENTRY_COUNT = "session:entries:count";
 
-// TTL for player entries: 24 hours in seconds.
-const ENTRY_TTL_SECONDS = 60 * 60 * 24;
+function kvEntryKey(entryId: string) {
+  return `entry:${entryId}`;
+}
+
+function kvChallengeKey(challengeId: string) {
+  return `challenge:${challengeId}`;
+}
 
 // ---------------------------------------------------------------------------
 // CORS helpers
 // ---------------------------------------------------------------------------
 
-function corsHeaders(origin: string | null): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": origin ?? "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+function corsHeaders(): HeadersInit {
+  return CORS_HEADERS;
 }
 
-function jsonResponse(
-  body: unknown,
-  status = 200,
-  origin: string | null = null
-): Response {
+function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      ...corsHeaders(origin),
-    },
+    headers: { "Content-Type": "application/json", ...corsHeaders() },
   });
 }
 
-function errorResponse(
-  message: string,
-  status: number,
-  origin: string | null = null
-): Response {
-  return jsonResponse({ error: message }, status, origin);
+function errorResponse(message: string, status = 400): Response {
+  return jsonResponse({ error: message }, status);
 }
 
 // ---------------------------------------------------------------------------
-// Session helpers
+// Default game config
 // ---------------------------------------------------------------------------
 
-async function getSessionConfig(env: Env): Promise<GameConfig> {
-  const raw = await env.GAME_KV.get(KV_SESSION_CONFIG);
-  if (raw) {
-    return JSON.parse(raw) as GameConfig;
-  }
-  // Return default config derived from wrangler vars.
-  const pool = env.DEFAULT_CHALLENGE_POOL.split(",").map((s) => s.trim()).filter(Boolean);
+function defaultConfig(challenges: ChallengeCard[]): GameConfig {
   return {
-    mode: env.DEFAULT_MODE === "pairs" ? "pairs" : "single",
-    assignmentStrategy:
-      env.DEFAULT_ASSIGNMENT_STRATEGY === "random" ? "random" : "round-robin",
-    challengePool: pool,
+    mode: "single",
+    assignmentStrategy: "round-robin",
+    challengePool: challenges.map((c) => c.id),
   };
 }
 
-async function getSessionState(env: Env): Promise<RoundState> {
-  const raw = await env.GAME_KV.get(KV_SESSION_STATE);
-  if (raw === "design_active" || raw === "answer_revealed" || raw === "reset") {
-    return raw;
-  }
-  return "lobby";
-}
-
-/**
- * Fetch-and-increment the entry counter for round-robin assignment.
- * Returns the *previous* counter value (zero-based entry index).
- *
- * Note: Cloudflare KV does not provide atomic read-modify-write operations,
- * so two simultaneous joins could read the same counter value and receive the
- * same challenge card. For events with typical participation (5–30 players
- * joining a few seconds apart) this is acceptable — in the worst case two
- * players share a challenge, and the game still functions correctly.
- * If strict uniqueness at high concurrency is required, migrate to a
- * Cloudflare Durable Object which provides serialised access to shared state.
- */
-async function nextEntryIndex(env: Env): Promise<number> {
-  const raw = await env.GAME_KV.get(KV_SESSION_COUNTER);
-  const current = raw ? parseInt(raw, 10) : 0;
-  await env.GAME_KV.put(KV_SESSION_COUNTER, String(current + 1));
-  return current;
-}
-
 // ---------------------------------------------------------------------------
-// Challenge assignment
+// Route handlers
 // ---------------------------------------------------------------------------
 
-/**
- * Assign a challenge from the pool.
- * - "round-robin": cycle through pool by entry index, ensuring even spread.
- * - "random": pick a random challenge from the pool.
- *
- * Both strategies wrap around once the pool is exhausted.
- */
-function pickChallenge(
-  pool: string[],
-  strategy: GameConfig["assignmentStrategy"],
-  entryIndex: number
-): string {
-  if (pool.length === 0) {
-    throw new Error("Challenge pool is empty");
-  }
-  if (strategy === "random") {
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
-  // round-robin
-  return pool[entryIndex % pool.length];
-}
+async function handlePostEntries(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as {
+    names?: string | [string, string];
+    mode?: "single" | "pairs";
+  };
 
-// ---------------------------------------------------------------------------
-// Request handlers
-// ---------------------------------------------------------------------------
-
-/** GET /api/session */
-async function handleGetSession(
-  env: Env,
-  origin: string | null
-): Promise<Response> {
-  const [config, state] = await Promise.all([
-    getSessionConfig(env),
-    getSessionState(env),
-  ]);
-  return jsonResponse({ config, state }, 200, origin);
-}
-
-/** POST /api/join */
-async function handleJoin(
-  request: Request,
-  env: Env,
-  origin: string | null
-): Promise<Response> {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return errorResponse("Invalid JSON body", 400, origin);
+  if (!body.names) {
+    return errorResponse("names is required");
   }
 
-  if (typeof body !== "object" || body === null) {
-    return errorResponse("Request body must be a JSON object", 400, origin);
+  // Check session state
+  const roundState = ((await env.GAME_KV.get(KV_SESSION_STATE)) ?? "lobby") as RoundState;
+  if (roundState !== "lobby") {
+    return errorResponse("Session is not accepting new entries right now", 409);
   }
 
-  const { names } = body as { names?: unknown };
-
-  // Validate names field
-  if (names === undefined || names === null) {
-    return errorResponse("names is required", 400, origin);
-  }
-
-  const config = await getSessionConfig(env);
-
-  if (config.mode === "pairs") {
-    if (
-      !Array.isArray(names) ||
-      names.length !== 2 ||
-      typeof names[0] !== "string" ||
-      typeof names[1] !== "string" ||
-      names[0].trim() === "" ||
-      names[1].trim() === ""
-    ) {
-      return errorResponse(
-        "pairs mode requires names to be an array of exactly two non-empty strings",
-        400,
-        origin
-      );
-    }
+  // Load config
+  const configRaw = await env.GAME_KV.get(KV_SESSION_CONFIG);
+  let config: GameConfig;
+  if (configRaw) {
+    config = JSON.parse(configRaw) as GameConfig;
   } else {
-    if (typeof names !== "string" || names.trim() === "") {
-      return errorResponse(
-        "single mode requires names to be a non-empty string",
-        400,
-        origin
-      );
-    }
+    const content = loadGameContent();
+    config = defaultConfig(content.challenges);
   }
 
-  // Generate a unique entry ID (crypto.randomUUID is available in CF Workers).
-  const entryId = crypto.randomUUID();
+  // Increment entry count
+  const countRaw = await env.GAME_KV.get(KV_SESSION_ENTRY_COUNT);
+  const entryIndex = countRaw ? parseInt(countRaw, 10) : 0;
+  await env.GAME_KV.put(KV_SESSION_ENTRY_COUNT, String(entryIndex + 1));
 
-  // Assign a challenge from the pool.
-  const entryIndex = await nextEntryIndex(env);
-  const assignedChallengeId = pickChallenge(
-    config.challengePool,
-    config.assignmentStrategy,
-    entryIndex
-  );
+  // Assign challenge
+  const challengeId = assignChallenge(config.challengePool, entryIndex);
 
-  const normalizedNames: string | [string, string] =
-    config.mode === "pairs"
-      ? [(names as string[])[0].trim(), (names as string[])[1].trim()]
-      : (names as string).trim();
+  // Load challenge from KV (or from static content)
+  let challenge: ChallengeCard | null = null;
+  const challengeRaw = await env.GAME_KV.get(kvChallengeKey(challengeId));
+  if (challengeRaw) {
+    challenge = JSON.parse(challengeRaw) as ChallengeCard;
+  } else {
+    const content = loadGameContent();
+    challenge = content.challenges.find((c) => c.id === challengeId) ?? null;
+  }
 
+  if (!challenge) {
+    return errorResponse(`Challenge ${challengeId} not found`, 500);
+  }
+
+  // Create entry
   const entry: PlayerEntry = {
-    entryId,
-    names: normalizedNames,
-    assignedChallengeId,
-    revealedHintTiers: [] as HintTier[],
+    entryId: nanoid(10),
+    names: body.names,
+    assignedChallengeId: challengeId,
+    revealedHintTiers: [],
     joinedAt: new Date().toISOString(),
   };
 
-  // Persist the entry with a TTL so stale entries are cleaned up automatically.
-  await env.GAME_KV.put(entryKey(entryId), JSON.stringify(entry), {
-    expirationTtl: ENTRY_TTL_SECONDS,
-  });
+  await env.GAME_KV.put(kvEntryKey(entry.entryId), JSON.stringify(entry));
 
-  return jsonResponse(entry, 201, origin);
+  return jsonResponse({ entry, challenge, roundState });
 }
 
-/** GET /api/entry/:entryId */
-async function handleGetEntry(
+async function handleGetEntry(entryId: string, env: Env): Promise<Response> {
+  const entryRaw = await env.GAME_KV.get(kvEntryKey(entryId));
+  if (!entryRaw) return errorResponse("Entry not found", 404);
+
+  const entry = JSON.parse(entryRaw) as PlayerEntry;
+  const roundState = ((await env.GAME_KV.get(KV_SESSION_STATE)) ?? "lobby") as RoundState;
+
+  let challenge: ChallengeCard | null = null;
+  const challengeRaw = await env.GAME_KV.get(kvChallengeKey(entry.assignedChallengeId));
+  if (challengeRaw) {
+    challenge = JSON.parse(challengeRaw) as ChallengeCard;
+  } else {
+    const content = loadGameContent();
+    challenge = content.challenges.find((c) => c.id === entry.assignedChallengeId) ?? null;
+  }
+
+  if (!challenge) return errorResponse("Challenge not found", 404);
+
+  return jsonResponse({ entry, challenge, roundState });
+}
+
+async function handleRevealHint(
   entryId: string,
-  env: Env,
-  origin: string | null
+  tierStr: string,
+  env: Env
 ): Promise<Response> {
-  if (!entryId || entryId.trim() === "") {
-    return errorResponse("entryId is required", 400, origin);
+  const tier = parseInt(tierStr, 10);
+  if (tier !== 1 && tier !== 2 && tier !== 3) {
+    return errorResponse("Tier must be 1, 2, or 3");
   }
 
-  const raw = await env.GAME_KV.get(entryKey(entryId));
-  if (!raw) {
-    return errorResponse("Entry not found", 404, origin);
+  const entryRaw = await env.GAME_KV.get(kvEntryKey(entryId));
+  if (!entryRaw) return errorResponse("Entry not found", 404);
+
+  const entry = JSON.parse(entryRaw) as PlayerEntry;
+
+  if (!entry.revealedHintTiers.includes(tier as HintTier)) {
+    entry.revealedHintTiers = [...entry.revealedHintTiers, tier as HintTier].sort(
+      (a, b) => a - b
+    ) as HintTier[];
+    await env.GAME_KV.put(kvEntryKey(entryId), JSON.stringify(entry));
   }
 
-  return jsonResponse(JSON.parse(raw) as PlayerEntry, 200, origin);
+  return jsonResponse({ revealedHintTiers: entry.revealedHintTiers });
+}
+
+async function handleGetSession(env: Env): Promise<Response> {
+  const roundState = ((await env.GAME_KV.get(KV_SESSION_STATE)) ?? "lobby") as RoundState;
+  const countRaw = await env.GAME_KV.get(KV_SESSION_ENTRY_COUNT);
+  const entryCount = countRaw ? parseInt(countRaw, 10) : 0;
+  const configRaw = await env.GAME_KV.get(KV_SESSION_CONFIG);
+  const config = configRaw
+    ? (JSON.parse(configRaw) as GameConfig)
+    : defaultConfig(loadGameContent().challenges);
+
+  return jsonResponse({ roundState, entryCount, config });
+}
+
+async function handlePostSessionState(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as { state?: RoundState };
+  const validStates: RoundState[] = ["lobby", "design_active", "answer_revealed", "reset"];
+
+  if (!body.state || !validStates.includes(body.state)) {
+    return errorResponse(`state must be one of: ${validStates.join(", ")}`);
+  }
+
+  await env.GAME_KV.put(KV_SESSION_STATE, body.state);
+  return jsonResponse({ roundState: body.state });
+}
+
+async function handlePostSessionReset(env: Env): Promise<Response> {
+  // List and delete all entry keys
+  const list = await env.GAME_KV.list({ prefix: "entry:" });
+  await Promise.all(list.keys.map((k) => env.GAME_KV.delete(k.name)));
+
+  // Reset state and count
+  await env.GAME_KV.put(KV_SESSION_STATE, "lobby");
+  await env.GAME_KV.put(KV_SESSION_ENTRY_COUNT, "0");
+
+  return jsonResponse({ ok: true });
+}
+
+async function handlePostSeed(env: Env): Promise<Response> {
+  const content = loadGameContent();
+
+  // Seed challenges
+  await Promise.all(
+    content.challenges.map((c) =>
+      env.GAME_KV.put(kvChallengeKey(c.id), JSON.stringify(c))
+    )
+  );
+
+  // Seed constraints, catalogue, and default config
+  await env.GAME_KV.put("constraints", JSON.stringify(content.constraints));
+  await env.GAME_KV.put("catalogue", JSON.stringify(content.serviceCatalogue));
+  await env.GAME_KV.put(KV_SESSION_CONFIG, JSON.stringify(defaultConfig(content.challenges)));
+
+  return jsonResponse({ ok: true, seededChallenges: content.challenges.length });
 }
 
 // ---------------------------------------------------------------------------
@@ -278,28 +239,56 @@ async function handleGetEntry(
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const origin = request.headers.get("Origin");
-
-    // Handle CORS preflight requests.
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders(origin) });
-    }
-
     const { pathname } = url;
+    const reqMethod = request.method;
 
-    if (pathname === "/api/session" && request.method === "GET") {
-      return handleGetSession(env, origin);
+    // Handle CORS preflight
+    if (reqMethod === "OPTIONS" && pathname.startsWith("/api/")) {
+      return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
-    if (pathname === "/api/join" && request.method === "POST") {
-      return handleJoin(request, env, origin);
+    // Route: POST /api/entries
+    if (reqMethod === "POST" && pathname === "/api/entries") {
+      return handlePostEntries(request, env);
     }
 
-    const entryMatch = pathname.match(/^\/api\/entry\/([^/]+)$/);
-    if (entryMatch && request.method === "GET") {
-      return handleGetEntry(entryMatch[1], env, origin);
+    // Route: GET /api/entries/:entryId
+    const entryMatch = pathname.match(/^\/api\/entries\/([^/]+)$/);
+    if (reqMethod === "GET" && entryMatch) {
+      return handleGetEntry(entryMatch[1], env);
     }
 
-    return errorResponse("Not found", 404, origin);
+    // Route: POST /api/entries/:entryId/hints/:tier
+    const hintMatch = pathname.match(/^\/api\/entries\/([^/]+)\/hints\/(\d+)$/);
+    if (reqMethod === "POST" && hintMatch) {
+      return handleRevealHint(hintMatch[1], hintMatch[2], env);
+    }
+
+    // Route: GET /api/session
+    if (reqMethod === "GET" && pathname === "/api/session") {
+      return handleGetSession(env);
+    }
+
+    // Route: POST /api/session/state
+    if (reqMethod === "POST" && pathname === "/api/session/state") {
+      return handlePostSessionState(request, env);
+    }
+
+    // Route: POST /api/session/reset
+    if (reqMethod === "POST" && pathname === "/api/session/reset") {
+      return handlePostSessionReset(env);
+    }
+
+    // Route: POST /api/seed
+    if (reqMethod === "POST" && pathname === "/api/seed") {
+      return handlePostSeed(env);
+    }
+
+    // Catch-all: serve static assets
+    if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+
+    return errorResponse("Not found", 404);
   },
-};
+} satisfies ExportedHandler<Env>;

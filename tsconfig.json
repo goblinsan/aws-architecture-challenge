@@ -14,10 +14,7 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "paths": {
-      "@content/*": ["./content/*"]
-    }
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "content"]
 }
