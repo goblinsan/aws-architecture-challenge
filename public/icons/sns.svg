@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64px" height="64px" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Icon-Architecture/48/Arch_Amazon-Simple-Notification-Service_48</title>
+    <g id="Icon-Architecture/48/Arch_Amazon-SNS_48" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Icon-Architecture-BG/48/Application-Integration" fill="#E7157B">
+            <rect id="Rectangle" x="0" y="0" width="64" height="64"></rect>
+        </g>
+        <path d="M32,14 C24.832,14 19,19.832 19,27 C19,34.168 24.832,40 32,40 C39.168,40 45,34.168 45,27 C45,19.832 39.168,14 32,14 M32,42 C23.729,42 17,35.271 17,27 C17,18.729 23.729,12 32,12 C40.271,12 47,18.729 47,27 C47,35.271 40.271,42 32,42 M33,27 L33,18 L31,18 L31,27 L26,27 L32,34 L38,27 L33,27 Z M14.022,44.958 L12.596,43.551 L18.449,37.612 L19.875,39.019 L14.022,44.958 Z M49.504,43.549 L48.078,44.957 L42.225,39.017 L43.651,37.61 L49.504,43.549 Z M33,49 L31,49 L31,42 L33,42 L33,49 Z M22.25,47.299 L20.482,46.276 L24.087,40.048 L25.856,41.071 L22.25,47.299 Z M43.518,46.276 L41.75,47.299 L38.144,41.071 L39.913,40.048 L43.518,46.276 Z M32,54 C29.794,54 28,52.206 28,50 C28,47.794 29.794,46 32,46 C34.206,46 36,47.794 36,50 C36,52.206 34.206,54 32,54 M32,44 C28.691,44 26,46.691 26,50 C26,53.309 28.691,56 32,56 C35.309,56 38,53.309 38,50 C38,46.691 35.309,44 32,44" id="Amazon-Simple-Notification-Service_Icon_48_Squid" fill="#FFFFFF"></path>
+    </g>
+</svg>
