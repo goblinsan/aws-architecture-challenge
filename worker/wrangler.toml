@@ -6,6 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 # Built frontend output; run `npm run build` before deploying.
 directory = "../dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 # KV namespace for game session state and player entries.
