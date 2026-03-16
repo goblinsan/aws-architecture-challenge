@@ -110,8 +110,16 @@ async function getSessionState(env: Env): Promise<RoundState> {
 }
 
 /**
- * Atomically fetch-and-increment the entry counter.
+ * Fetch-and-increment the entry counter for round-robin assignment.
  * Returns the *previous* counter value (zero-based entry index).
+ *
+ * Note: Cloudflare KV does not provide atomic read-modify-write operations,
+ * so two simultaneous joins could read the same counter value and receive the
+ * same challenge card. For events with typical participation (5–30 players
+ * joining a few seconds apart) this is acceptable — in the worst case two
+ * players share a challenge, and the game still functions correctly.
+ * If strict uniqueness at high concurrency is required, migrate to a
+ * Cloudflare Durable Object which provides serialised access to shared state.
  */
 async function nextEntryIndex(env: Env): Promise<number> {
   const raw = await env.GAME_KV.get(KV_SESSION_COUNTER);
