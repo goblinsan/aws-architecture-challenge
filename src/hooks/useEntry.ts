@@ -126,6 +126,15 @@ export function useEntry(): UseEntryResult {
           setRoundState(session.state);
           if (session.state === "reset") {
             clearEntry();
+            return;
+          }
+          // Re-fetch entry to pick up per-user answer visibility changes.
+          const storedId = localStorage.getItem(STORAGE_KEY);
+          if (storedId) {
+            const updated = await fetchEntry(storedId);
+            if (updated) {
+              setEntry(updated);
+            }
           }
         } catch {
           // Silently swallow polling errors — a transient network blip should

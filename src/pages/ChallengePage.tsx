@@ -115,7 +115,8 @@ export default function ChallengePage({
     ? entry.names.join(" & ")
     : entry.names;
 
-  const isAnswerRevealed = roundState === "answer_revealed";
+  const isAnswerRevealed =
+    roundState === "answer_revealed" || entry.answerVisible === true;
 
   // When the answer is revealed, always switch to the challenge tab so the
   // answer panel is visible immediately.

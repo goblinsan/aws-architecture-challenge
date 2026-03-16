@@ -13,6 +13,7 @@
 import { useState } from "react";
 import type { Answer } from "@content/schema/types";
 import AwsServiceIcon from "./AwsServiceIcon";
+import MermaidDiagram from "./MermaidDiagram";
 
 interface AccordionSectionProps {
   label: string;
@@ -72,6 +73,15 @@ export default function AnswerPanel({ answer }: AnswerPanelProps) {
       <p className="text-sm text-gray-700 leading-relaxed mt-3 mb-2">
         {answer.summary}
       </p>
+
+      {/* Architecture Diagram */}
+      {answer.diagram && (
+        <AccordionSection label="Architecture Diagram">
+          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+            <MermaidDiagram chart={answer.diagram} />
+          </div>
+        </AccordionSection>
+      )}
 
       {/* Core Services — icon grid with text labels (issues #31 & #32) */}
       <AccordionSection label="Core Services">

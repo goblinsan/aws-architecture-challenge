@@ -51,7 +51,8 @@
         ],
         "resilienceNotes": "SQS dead-letter queues capture any failed transaction messages for reprocessing. DynamoDB point-in-time recovery provides continuous backup. Lambda automatically retries on transient failures. API Gateway is multi-AZ by default.",
         "securityNotes": "KMS customer-managed keys encrypt all DynamoDB data at rest. Secrets Manager rotates payment gateway API credentials automatically. Lambda functions run in a VPC with no inbound internet access. API Gateway resource policies restrict access to known IP ranges during testing.",
-        "whyItFits": "High Volume: SQS absorbs burst traffic and Lambda scales concurrently without pre-provisioning. PCI Compliance: all services are PCI DSS-certified; card data never touches self-managed infrastructure. Low Latency: provisioned concurrency on Lambda eliminates cold starts; DynamoDB single-digit millisecond reads keep authorization fast."
+        "whyItFits": "High Volume: SQS absorbs burst traffic and Lambda scales concurrently without pre-provisioning. PCI Compliance: all services are PCI DSS-certified; card data never touches self-managed infrastructure. Low Latency: provisioned concurrency on Lambda eliminates cold starts; DynamoDB single-digit millisecond reads keep authorization fast.",
+        "diagram": "graph LR\n    Client([Client])-->APIGW[API Gateway]\n    APIGW-->Validate[Lambda]\n    Validate-->KMS[KMS]\n    Validate-->DDB[(DynamoDB)]\n    Validate-->SQS[SQS]\n    SQS-->Process[Lambda]\n    Process-->SM[Secrets Manager]\n    Process-->DDB"
       }
     },
     {
@@ -103,7 +104,8 @@
         ],
         "resilienceNotes": "Kinesis Data Streams retains records for 24 hours by default (extendable to 7 days), allowing replay if a consumer fails. Firehose automatically retries S3 delivery on transient failures. S3 provides eleven nines of durability.",
         "securityNotes": "Enable server-side encryption on the Kinesis stream and S3 bucket using KMS. Restrict Glue Data Catalog access with IAM resource-based policies. Use Athena workgroup settings to enforce query result encryption and cost controls.",
-        "whyItFits": "High Volume: Kinesis Data Streams scales to hundreds of shards to absorb 100,000 events per second. Near Real-Time: Firehose's 60-second delivery window meets the SLA; Glue and Athena make data queryable immediately after each S3 object lands."
+        "whyItFits": "High Volume: Kinesis Data Streams scales to hundreds of shards to absorb 100,000 events per second. Near Real-Time: Firehose's 60-second delivery window meets the SLA; Glue and Athena make data queryable immediately after each S3 object lands.",
+        "diagram": "graph LR\n    Clients([Platform Clients])-->KDS[Kinesis Data Streams]\n    KDS-->FH[Kinesis Firehose]\n    FH-->S3[(S3)]\n    S3-->Glue[Glue Data Catalog]\n    Glue-->Athena[Athena]"
       }
     },
     {
@@ -155,7 +157,8 @@
         ],
         "resilienceNotes": "Step Functions has built-in retry policies with configurable backoff for each task state. SQS dead-letter queues capture any failed messages for investigation. Lambda automatically retries on transient errors. EventBridge replays failed event deliveries up to 24 hours.",
         "securityNotes": "Each Lambda function uses a least-privilege IAM role scoped only to the resources it needs. Secrets Manager stores credentials for third-party HR APIs. SES sending identities are verified to prevent spoofing.",
-        "whyItFits": "Operational Simplicity: EventBridge, Step Functions, Lambda, and SES are all fully managed with zero server provisioning or patching. Cost Sensitive: the entire workflow is pay-per-execution — the system costs near zero when no hires are being onboarded."
+        "whyItFits": "Operational Simplicity: EventBridge, Step Functions, Lambda, and SES are all fully managed with zero server provisioning or patching. Cost Sensitive: the entire workflow is pay-per-execution — the system costs near zero when no hires are being onboarded.",
+        "diagram": "graph TD\n    HR([HR System])-->EB[EventBridge]\n    EB-->SF[Step Functions]\n    SF-->L1[Lambda: Docs]\n    SF-->L2[Lambda: IT]\n    SF-->L3[Lambda: Benefits]\n    SF-->SES[SES]"
       }
     },
     {
@@ -207,7 +210,8 @@
         ],
         "resilienceNotes": "SQS visibility timeout and message retention prevent job loss if a Lambda invocation fails. MediaConvert automatically retries transient failures. S3 event notifications are at-least-once — Lambda handlers must be idempotent. S3 versioning on the output bucket protects against accidental overwrites.",
         "securityNotes": "S3 bucket policies block public access on both input and output buckets. IAM roles for Lambda and MediaConvert follow least privilege. Pre-signed S3 URLs are used for secure creator uploads without exposing bucket credentials. KMS encrypts stored video files at rest.",
-        "whyItFits": "High Volume: SQS decouples uploads from transcoding, preventing the pipeline from being overwhelmed during upload spikes. MediaConvert scales to thousands of concurrent jobs without capacity planning. Cost Sensitive: the serverless and managed pipeline charges only for what is used — zero cost overnight when no uploads occur."
+        "whyItFits": "High Volume: SQS decouples uploads from transcoding, preventing the pipeline from being overwhelmed during upload spikes. MediaConvert scales to thousands of concurrent jobs without capacity planning. Cost Sensitive: the serverless and managed pipeline charges only for what is used — zero cost overnight when no uploads occur.",
+        "diagram": "graph LR\n    Upload([Creator])-->S3In[(S3 Input)]\n    S3In-->|Event|SQS[SQS]\n    SQS-->Lambda[Lambda]\n    Lambda-->MC[MediaConvert]\n    MC-->S3Out[(S3 Output)]\n    MC-->SNS[SNS]"
       }
     },
     {
@@ -260,7 +264,8 @@
         ],
         "resilienceNotes": "Route 53 health checks detect regional failures within 10–30 seconds and reroute DNS automatically. DynamoDB Global Tables provide active-active replication with automatic conflict resolution. Lambda functions are deployed independently in each region and do not share state between regions.",
         "securityNotes": "Amazon Connect uses IAM for agent authentication and resource-based policies for instance isolation. Call recordings are encrypted with KMS and stored in S3. HIPAA and PCI eligibility is available on Connect — verify applicable compliance requirements for the use case. VPC endpoints prevent Lambda from traversing the public internet when calling DynamoDB.",
-        "whyItFits": "Global Accessibility: Connect instances in multiple regions reduce latency for agents and callers in each geography. Multi-Region Resilience: Route 53 health-check failover and DynamoDB Global Tables ensure the platform continues operating even if one region is completely unavailable."
+        "whyItFits": "Global Accessibility: Connect instances in multiple regions reduce latency for agents and callers in each geography. Multi-Region Resilience: Route 53 health-check failover and DynamoDB Global Tables ensure the platform continues operating even if one region is completely unavailable.",
+        "diagram": "graph TD\n    Customer([Customer])-->R53[Route 53]\n    R53-->C1[Connect Region 1]\n    R53-->C2[Connect Region 2]\n    C1-->L1[Lambda]\n    C2-->L2[Lambda]\n    L1-->DDB[(DynamoDB Global Tables)]\n    L2-->DDB"
       }
     },
     {
@@ -313,7 +318,8 @@
         ],
         "resilienceNotes": "Kinesis retains records for 24 hours, allowing the anomaly detection Lambda to replay events after a failure. Firehose retries S3 delivery automatically on transient errors. IoT Core is multi-AZ and handles device reconnections transparently. S3 lifecycle policies enforce the 90-day retention window automatically.",
         "securityNotes": "Each device authenticates to IoT Core using a unique X.509 certificate. IoT policies restrict each device to publishing only on its own topic prefix. KMS encrypts data at rest in Kinesis, S3, and any downstream stores. VPC endpoints prevent Lambda from accessing KMS and S3 over the public internet.",
-        "whyItFits": "High Volume: IoT Core and Kinesis Data Streams are designed for millions of concurrent device connections and thousands of messages per second without capacity pre-provisioning. Near Real-Time: the Kinesis → Lambda path delivers anomaly alerts within 5–10 seconds of sensor data being ingested."
+        "whyItFits": "High Volume: IoT Core and Kinesis Data Streams are designed for millions of concurrent device connections and thousands of messages per second without capacity pre-provisioning. Near Real-Time: the Kinesis → Lambda path delivers anomaly alerts within 5–10 seconds of sensor data being ingested.",
+        "diagram": "graph TD\n    Sensors([50K Sensors])-->|MQTT|IoT[IoT Core]\n    IoT-->|Rules|KDS[Kinesis Streams]\n    KDS-->Lambda[Lambda]\n    Lambda-->SNS[SNS Alert]\n    KDS-->FH[Firehose]\n    FH-->S3[(S3 90-day)]"
       }
     },
     {
@@ -365,7 +371,223 @@
         ],
         "resilienceNotes": "API Gateway is multi-AZ and automatically scales with no configuration. Lambda scales concurrently per request. CloudWatch alarms on 5XX error rate and integration latency provide early warning of downstream microservice degradation. WAF rules mitigate common API attack patterns including SQL injection and request flooding.",
         "securityNotes": "Cognito User Pools issue and validate short-lived JWTs, eliminating the need to manage credentials for API consumers. AWS WAF sits in front of API Gateway to block malicious traffic before it reaches Lambda. Resource policies on the API restrict invocation to known internal IP ranges. CloudWatch Logs capture all API access for audit purposes.",
-        "whyItFits": "Low Latency: HTTP API Gateway has lower overhead than REST API; Cognito JWT validation happens at the edge before Lambda is invoked. Operational Simplicity: API Gateway, Cognito, Lambda, and CloudWatch are all fully managed — zero servers, zero patching, and zero custom authorisation code."
+        "whyItFits": "Low Latency: HTTP API Gateway has lower overhead than REST API; Cognito JWT validation happens at the edge before Lambda is invoked. Operational Simplicity: API Gateway, Cognito, Lambda, and CloudWatch are all fully managed — zero servers, zero patching, and zero custom authorisation code.",
+        "diagram": "graph LR\n    Dev([Developer])-->WAF[WAF]\n    WAF-->APIGW[API Gateway]\n    APIGW-->Auth[Cognito]\n    APIGW-->L1[Lambda A]\n    APIGW-->L2[Lambda B]\n    APIGW-->L3[Lambda C]\n    L1-->CW[CloudWatch]"
+      }
+    },
+    {
+      "id": "serverless-rest-api",
+      "title": "Serverless Mobile Backend",
+      "scenario": "A startup is building a mobile app for restaurant reviews. The backend must serve a REST API for user authentication, restaurant listings, and review submissions. Traffic is unpredictable — from 10 requests per minute during off-peak to 2,000 requests per second after a TV feature. The two-person team cannot manage any servers or containers.",
+      "difficulty": "easy",
+      "constraints": [
+        "operational-simplicity",
+        "cost-sensitivity"
+      ],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Think about what lets you run backend code without managing any servers or capacity planning. How do you handle authentication for mobile users without building your own sign-up and login system?"
+        },
+        {
+          "tier": 2,
+          "text": "AWS has a managed user directory service that handles sign-up, sign-in, and JWT issuance for mobile apps out of the box. Pair it with a managed API gateway service to create HTTP endpoints that scale automatically."
+        },
+        {
+          "tier": 3,
+          "text": "Use Cognito User Pools for authentication, API Gateway (HTTP API) for routing, Lambda functions for business logic, and DynamoDB for data storage. CloudFront in front of API Gateway improves global latency and caching."
+        }
+      ],
+      "answer": {
+        "summary": "Cognito handles user sign-up, login, and JWT issuance. API Gateway HTTP API routes authenticated requests to Lambda functions implementing the REST endpoints. DynamoDB stores restaurants and reviews with single-digit millisecond reads. CloudFront sits in front for global edge caching of read-heavy listing endpoints.",
+        "coreServices": [
+          "Amazon Cognito",
+          "Amazon API Gateway",
+          "AWS Lambda",
+          "Amazon DynamoDB",
+          "Amazon CloudFront"
+        ],
+        "optionalVariants": [
+          {
+            "title": "AppSync GraphQL API",
+            "description": "Replace API Gateway + Lambda with AWS AppSync for a GraphQL API with built-in real-time subscriptions; adds complexity for teams unfamiliar with GraphQL but reduces the number of Lambda functions needed."
+          },
+          {
+            "title": "Aurora Serverless for Relational Data",
+            "description": "Use Aurora Serverless v2 instead of DynamoDB if the data model requires complex joins and relational queries; adds cost during idle periods but simplifies reporting queries."
+          }
+        ],
+        "tradeoffs": [
+          "DynamoDB requires upfront data modelling with access patterns in mind — retrofitting a new query pattern later may require a secondary index or table redesign.",
+          "Lambda cold starts can add 200–500ms on the first request after idle — use provisioned concurrency for latency-sensitive endpoints if needed.",
+          "CloudFront caching requires careful cache-key design to avoid serving stale review data while still caching restaurant listings effectively."
+        ],
+        "resilienceNotes": "All services are multi-AZ by default. DynamoDB provides continuous backups with point-in-time recovery. Lambda automatically retries on transient failures. CloudFront's edge locations provide natural redundancy against regional issues for cached content.",
+        "securityNotes": "Cognito issues short-lived JWTs validated at the API Gateway layer before any Lambda code executes. DynamoDB encryption at rest is enabled by default. Lambda functions use least-privilege IAM roles. API Gateway resource policies can restrict access to known mobile app user agents during development.",
+        "whyItFits": "Operational Simplicity: Cognito, API Gateway, Lambda, and DynamoDB are all fully managed — zero servers to provision, patch, or scale. Cost Sensitive: every component is pay-per-use with generous free tiers — the system costs pennies during low traffic and scales automatically during viral spikes.",
+        "diagram": "graph TD\n    App([Mobile App])-->CF[CloudFront]\n    CF-->APIGW[API Gateway]\n    APIGW-->Auth[Cognito]\n    APIGW-->L1[Lambda: Listings]\n    APIGW-->L2[Lambda: Reviews]\n    APIGW-->L3[Lambda: Users]\n    L1-->DDB[(DynamoDB)]\n    L2-->DDB\n    L3-->DDB"
+      }
+    },
+    {
+      "id": "data-lake-analytics",
+      "title": "Retail Data Lake Analytics",
+      "scenario": "A national retail chain wants to consolidate data from 500 stores — point-of-sale transactions, inventory counts, and customer loyalty events — into a central analytics platform. Business analysts need to run SQL queries across the full dataset and build dashboards without waiting for the data engineering team. The dataset grows by 50 GB daily and must be queryable within one hour of arrival.",
+      "difficulty": "medium",
+      "constraints": [
+        "high-volume",
+        "cost-sensitivity"
+      ],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Think about where you would land and store large volumes of data cheaply so that it survives indefinitely and can be queried without loading it into a traditional database. What is the most cost-effective durable storage on AWS?"
+        },
+        {
+          "tier": 2,
+          "text": "AWS has a managed ETL service that can crawl raw data, infer schemas, and register them in a central catalogue — making your S3 data queryable by standard SQL tools without a database cluster."
+        },
+        {
+          "tier": 3,
+          "text": "Store raw data in S3. Use Glue crawlers and ETL jobs to clean, partition, and register data in the Glue Data Catalog. Athena runs serverless SQL queries directly on S3. QuickSight connects to Athena for dashboard visualisation. Lake Formation governs fine-grained access control."
+        }
+      ],
+      "answer": {
+        "summary": "Raw store data lands in S3 via Kinesis Firehose (streaming) or S3 batch uploads (daily). Glue ETL jobs clean, partition by date and store, and write Parquet files back to S3. The Glue Data Catalog registers schemas so Athena can run SQL queries directly against S3. QuickSight connects to Athena for interactive dashboards accessible to business analysts. Lake Formation provides column-level access control.",
+        "coreServices": [
+          "Amazon S3",
+          "AWS Glue",
+          "Amazon Athena",
+          "Amazon QuickSight",
+          "Amazon Kinesis Data Firehose",
+          "AWS Lake Formation"
+        ],
+        "optionalVariants": [
+          {
+            "title": "Redshift Serverless for Complex Analytics",
+            "description": "Add Redshift Serverless for sub-second queries on frequently accessed data; higher cost than Athena but dramatically faster for complex joins across large tables."
+          },
+          {
+            "title": "Apache Spark on EMR Serverless",
+            "description": "Run Spark jobs on EMR Serverless instead of Glue ETL for teams with existing PySpark expertise; more flexible but requires more configuration and monitoring."
+          }
+        ],
+        "tradeoffs": [
+          "Athena charges per TB scanned — partitioning by date and store and using columnar formats like Parquet is essential to control costs as the dataset grows.",
+          "Glue ETL job startup time is 1–2 minutes per run — batch multiple files into fewer larger jobs rather than triggering per-file.",
+          "QuickSight SPICE in-memory cache accelerates dashboards but requires periodic refresh scheduling to keep data current."
+        ],
+        "resilienceNotes": "S3 provides eleven nines of durability. Glue jobs can be configured with automatic retries on failure. Athena queries are stateless and can be retried immediately. QuickSight SPICE datasets are replicated across multiple AZs.",
+        "securityNotes": "Lake Formation enforces column-level and row-level access controls so analysts see only data they are authorised to access. S3 bucket policies enforce encryption at rest with KMS. Glue jobs run in a private VPC with no internet access. Athena workgroup settings enforce query result encryption and scan limits.",
+        "whyItFits": "High Volume: S3 scales infinitely for storage; Glue and Athena process terabytes without provisioning clusters. Cost Sensitive: S3 storage is pennies per GB; Athena charges only per query; Glue charges per DPU-minute — there are no idle clusters running overnight.",
+        "diagram": "graph TD\n    Stores([500 Stores])-->FH[Kinesis Firehose]\n    Stores-->Batch[S3 Batch Upload]\n    FH-->S3[(S3 Data Lake)]\n    Batch-->S3\n    S3-->Glue[Glue ETL]\n    Glue-->S3\n    S3-->Cat[Glue Catalog]\n    Cat-->Athena[Athena]\n    Athena-->QS[QuickSight]\n    S3-->LF[Lake Formation]"
+      }
+    },
+    {
+      "id": "real-time-collaboration",
+      "title": "Real-Time Collaborative Workspace",
+      "scenario": "A productivity startup is building a collaborative document editor where up to 50 users can edit the same document simultaneously. Every keystroke must be visible to all participants within 200 milliseconds. The system must handle 10,000 concurrent editing sessions at peak. The team wants minimal infrastructure to manage.",
+      "difficulty": "medium",
+      "constraints": [
+        "low-latency",
+        "near-real-time"
+      ],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Traditional request-response APIs poll for changes and introduce latency. What communication protocol lets the server push updates to all connected clients instantly without polling?"
+        },
+        {
+          "tier": 2,
+          "text": "API Gateway supports WebSocket APIs that maintain persistent connections to clients. Think about how you would track which connections belong to the same document and broadcast changes efficiently."
+        },
+        {
+          "tier": 3,
+          "text": "Use API Gateway WebSocket API for persistent connections. Lambda handles connect, disconnect, and message events. DynamoDB stores connection mappings and document state. ElastiCache (Redis) provides sub-millisecond pub/sub for broadcasting edits to all participants in a document room."
+        }
+      ],
+      "answer": {
+        "summary": "Clients connect via API Gateway WebSocket API, which maintains persistent bidirectional connections. Lambda functions handle connection lifecycle and message routing. DynamoDB stores the connection-to-document mapping and persists document state. ElastiCache (Redis) provides sub-millisecond pub/sub to fan out edits to all participants in the same document room, keeping broadcast latency under 200ms.",
+        "coreServices": [
+          "Amazon API Gateway",
+          "AWS Lambda",
+          "Amazon DynamoDB",
+          "Amazon ElastiCache",
+          "Amazon CloudWatch"
+        ],
+        "optionalVariants": [
+          {
+            "title": "AWS AppSync Subscriptions",
+            "description": "Use AppSync with real-time subscriptions instead of API Gateway WebSocket for simpler client-side integration; adds a GraphQL dependency but eliminates manual connection management code."
+          },
+          {
+            "title": "IoT Core MQTT for Fan-Out",
+            "description": "Use IoT Core as the pub/sub layer instead of ElastiCache — each document becomes an MQTT topic; eliminates cache infrastructure but adds IoT Core message costs and a 128KB payload limit."
+          }
+        ],
+        "tradeoffs": [
+          "API Gateway WebSocket has a 29-second idle timeout — implement heartbeat pings to keep connections alive during idle editing periods.",
+          "ElastiCache requires a VPC and adds a fixed hourly cost — size the cluster for peak concurrent sessions, not average, to avoid latency spikes.",
+          "DynamoDB write throughput for document state must handle 50 users × keystroke rate — use batch writes and client-side buffering to reduce write volume."
+        ],
+        "resilienceNotes": "API Gateway WebSocket connections automatically reconnect on transient failures. DynamoDB provides point-in-time recovery for document state. ElastiCache Multi-AZ provides automatic failover. Lambda retries on transient errors with configurable backoff.",
+        "securityNotes": "API Gateway authorizers validate JWT tokens on the WebSocket $connect route before establishing the connection. DynamoDB encryption at rest protects document content. ElastiCache in-transit encryption secures internal pub/sub traffic. Lambda functions use least-privilege IAM roles scoped to their specific DynamoDB tables and ElastiCache clusters.",
+        "whyItFits": "Low Latency: ElastiCache Redis pub/sub delivers under 1ms fan-out; API Gateway WebSocket eliminates HTTP polling overhead. Near Real-Time: the push-based architecture ensures edits are visible to all participants within 200ms of being made.",
+        "diagram": "graph TD\n    U1([User])-->|WebSocket|APIGW[API Gateway WebSocket]\n    U2([User])-->|WebSocket|APIGW\n    APIGW-->LConn[Lambda: Connect]\n    APIGW-->LMsg[Lambda: Message]\n    APIGW-->LDisc[Lambda: Disconnect]\n    LConn-->DDB[(DynamoDB)]\n    LMsg-->DDB\n    LMsg-->Cache[ElastiCache Redis]\n    LMsg-->|Broadcast|APIGW"
+      }
+    },
+    {
+      "id": "multi-region-dr",
+      "title": "Multi-Region Disaster Recovery",
+      "scenario": "A B2B SaaS company provides a contract management platform used by enterprise clients during business hours worldwide. Their SLA guarantees 99.99% availability and a recovery time objective (RTO) of under 15 minutes. The platform currently runs in a single AWS region. Management has approved a budget-conscious approach that balances resilience against cost — they do not want to pay for full active-active capacity in a second region at all times.",
+      "difficulty": "hard",
+      "constraints": [
+        "multi-region-resilience",
+        "cost-sensitivity"
+      ],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Think about the spectrum of DR strategies — backup & restore, pilot light, warm standby, and active-active. Which strategy meets a 15-minute RTO without paying for full capacity in two regions?"
+        },
+        {
+          "tier": 2,
+          "text": "A warm standby strategy runs a scaled-down copy of the production stack in a second region. AWS has a managed database feature that replicates data continuously across regions with sub-second lag — what is it called?"
+        },
+        {
+          "tier": 3,
+          "text": "Use Aurora Global Database for cross-region replication with <1 second lag. ECS Fargate in the DR region runs a minimal task count (warm standby). Route 53 health checks detect primary region failure and fail over DNS. S3 Cross-Region Replication keeps static assets in sync. On failover, auto-scaling policies in the DR region scale up to full capacity."
+        }
+      ],
+      "answer": {
+        "summary": "The primary region runs the full production stack on ECS Fargate behind an ALB, with Aurora as the database and S3 for static assets. A warm standby in the DR region runs a minimal ECS task count with Aurora Global Database providing continuous replication (<1 second lag). Route 53 health checks monitor the primary and automatically fail over DNS within 60 seconds. On failover, ECS auto-scaling in the DR region scales to production capacity within minutes, meeting the 15-minute RTO.",
+        "coreServices": [
+          "Amazon Route 53",
+          "Amazon Aurora",
+          "Amazon ECS",
+          "Elastic Load Balancing",
+          "Amazon S3",
+          "AWS CloudFormation"
+        ],
+        "optionalVariants": [
+          {
+            "title": "Pilot Light Instead of Warm Standby",
+            "description": "Keep only the database replica running in the DR region and launch compute on demand during failover; reduces ongoing DR cost by 60% but increases RTO to 20–30 minutes for compute provisioning."
+          },
+          {
+            "title": "Active-Active with DynamoDB Global Tables",
+            "description": "Replace Aurora with DynamoDB Global Tables for active-active multi-region writes; eliminates the promote-replica step during failover but requires redesigning the data model for eventual consistency."
+          }
+        ],
+        "tradeoffs": [
+          "Aurora Global Database requires promoting the DR replica to a standalone writer during failover — this takes 1–2 minutes and is the single largest contributor to RTO.",
+          "Running a minimal warm standby in the DR region costs roughly 20% of primary region spend — pilot light is cheaper but risks exceeding the 15-minute RTO.",
+          "Route 53 DNS TTL must be set low (60 seconds) to minimise failover detection time, which slightly increases DNS query costs.",
+          "S3 Cross-Region Replication is asynchronous — files uploaded in the seconds before a failure may not yet be in the DR region."
+        ],
+        "resilienceNotes": "Route 53 health checks run every 10 seconds from multiple locations. Aurora Global Database replication lag is typically under 1 second. ECS auto-scaling reacts to the increased load within 2–3 minutes. CloudFormation stack sets ensure both regions have identical infrastructure definitions. S3 CRR provides eventual consistency with typical lag under 15 minutes for new objects.",
+        "securityNotes": "Aurora encryption at rest with KMS is replicated to the DR region using a separate region-specific KMS key. IAM roles and policies are deployed identically to both regions via CloudFormation StackSets. VPC configurations in both regions use identical CIDR ranges connected via Transit Gateway for secure cross-region communication during failover testing. Secrets Manager replicates database credentials to the DR region.",
+        "whyItFits": "Multi-Region Resilience: warm standby with Aurora Global Database and Route 53 failover delivers an RTO under 15 minutes with automated detection and DNS switchover. Cost Sensitive: running minimal compute in the DR region costs a fraction of active-active while still meeting the availability SLA.",
+        "diagram": "graph TD\n    Users([Users])-->R53[Route 53 Failover]\n    R53-->ALB1[ALB Primary]\n    R53-->ALB2[ALB DR]\n    ALB1-->ECS1[ECS Fargate]\n    ALB2-->ECS2[ECS Fargate Minimal]\n    ECS1-->Aurora1[(Aurora Primary)]\n    ECS2-->Aurora2[(Aurora Replica)]\n    Aurora1-->|Global DB|Aurora2\n    ECS1-->S3P[(S3)]\n    S3P-->|CRR|S3D[(S3 Replica)]"
       }
     }
   ]

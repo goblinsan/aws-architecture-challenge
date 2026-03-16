@@ -18,6 +18,6 @@ preview_id = "d3595311daf045da87d7c3b5d2c732dd"
 [vars]
 # Default session configuration used when no facilitator has configured the
 # session yet. Override by writing "session:config" to GAME_KV at runtime.
-DEFAULT_CHALLENGE_POOL = "payments-processing,analytics-ingestion,event-driven-onboarding,media-processing,global-customer-support,iot-telemetry,internal-api-platform"
+DEFAULT_CHALLENGE_POOL = "payments-processing,analytics-ingestion,event-driven-onboarding,media-processing,global-customer-support,iot-telemetry,internal-api-platform,serverless-rest-api,data-lake-analytics,real-time-collaboration,multi-region-dr"
 DEFAULT_MODE = "single"
 DEFAULT_ASSIGNMENT_STRATEGY = "round-robin"

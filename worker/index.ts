@@ -125,7 +125,7 @@ const ENTRY_TTL_SECONDS = 60 * 60 * 24;
 function corsHeaders(origin: string | null): HeadersInit {
   return {
     "Access-Control-Allow-Origin": origin ?? "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 }
@@ -489,6 +489,44 @@ async function handleDeleteEntry(
   return jsonResponse({ ok: true }, 200, origin);
 }
 
+/** POST /api/admin/entry/:entryId/answer – toggle answer visibility for a single player */
+async function handleToggleAnswer(
+  entryId: string,
+  request: Request,
+  env: Env,
+  origin: string | null
+): Promise<Response> {
+  if (!entryId || entryId.trim() === "") {
+    return errorResponse("entryId is required", 400, origin);
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse("Invalid JSON body", 400, origin);
+  }
+
+  const { visible } = body as { visible?: unknown };
+  if (typeof visible !== "boolean") {
+    return errorResponse("visible must be a boolean", 400, origin);
+  }
+
+  const raw = await env.GAME_KV.get(entryKey(entryId));
+  if (!raw) {
+    return errorResponse("Entry not found", 404, origin);
+  }
+
+  const entry = JSON.parse(raw) as PlayerEntry;
+  entry.answerVisible = visible;
+  await env.GAME_KV.put(entryKey(entryId), JSON.stringify(entry), {
+    expirationTtl: ENTRY_TTL_SECONDS,
+  });
+
+  logEvent("info", "answer_visibility_toggled", { entryId, visible });
+  return jsonResponse({ ok: true, answerVisible: visible }, 200, origin);
+}
+
 /** GET /api/admin/entries – list all active player entries for the admin dashboard */
 async function handleAdminEntries(
   env: Env,
@@ -655,6 +693,18 @@ export default {
       const adminEntryMatch = pathname.match(/^\/api\/admin\/entry\/([^/]+)$/);
       if (adminEntryMatch && request.method === "DELETE") {
         return await handleDeleteEntry(adminEntryMatch[1], env, origin);
+      }
+
+      const adminAnswerMatch = pathname.match(
+        /^\/api\/admin\/entry\/([^/]+)\/answer$/
+      );
+      if (adminAnswerMatch && request.method === "POST") {
+        return await handleToggleAnswer(
+          adminAnswerMatch[1],
+          request,
+          env,
+          origin
+        );
       }
 
       if (pathname === "/api/log" && request.method === "POST") {

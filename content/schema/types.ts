@@ -81,6 +81,8 @@ export interface Answer {
   securityNotes: string;
   /** Explicit mapping of why the chosen services satisfy the challenge constraints. */
   whyItFits: string;
+  /** Mermaid flowchart definition for the architecture diagram. */
+  diagram: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +193,8 @@ export interface PlayerEntry {
   revealedHintTiers: HintTier[];
   /** ISO timestamp when the entry was created. */
   joinedAt: string;
+  /** Whether the facilitator has revealed the answer for this specific entry. */
+  answerVisible?: boolean;
 }
 
 /** Current state of a game round, stored in Cloudflare KV or Durable Object. */

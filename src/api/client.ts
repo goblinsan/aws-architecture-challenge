@@ -154,3 +154,20 @@ export async function deleteAdminEntry(entryId: string): Promise<void> {
     throw new Error(`Failed to delete entry: ${res.status}`);
   }
 }
+
+export async function toggleAnswerVisibility(
+  entryId: string,
+  visible: boolean
+): Promise<void> {
+  const res = await fetch(
+    `/api/admin/entry/${encodeURIComponent(entryId)}/answer`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visible }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to toggle answer visibility: ${res.status}`);
+  }
+}
