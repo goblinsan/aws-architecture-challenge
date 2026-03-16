@@ -102,10 +102,12 @@ export function useEntry(): UseEntryResult {
         setEntry(newEntry);
         setStatus("active");
       } catch (err) {
+        // Stay on the join form (not the error screen) so the player can
+        // correct their input or retry without refreshing the page.
         setErrorMessage(
           err instanceof Error ? err.message : "Failed to join session"
         );
-        setStatus("error");
+        setStatus("join");
       }
     },
     []
