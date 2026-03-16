@@ -1,8 +1,9 @@
+// tsconfig specifically for the Cloudflare Worker, which targets a different
+// environment (no DOM, uses workers-types instead).
 {
   "compilerOptions": {
     "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2020"],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
@@ -10,14 +11,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    "types": ["@cloudflare/workers-types"],
     "paths": {
-      "@content/*": ["./content/*"]
+      "@content/*": ["../content/*"]
     }
   },
-  "include": ["src", "content"]
+  "include": ["index.ts", "../content"]
 }

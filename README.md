@@ -48,13 +48,19 @@ npm ci
 
 ### 2. Start local dev server
 
+In two terminals:
+
 ```bash
+# Terminal 1: Vite frontend dev server (http://localhost:5173)
 npm run dev
+
+# Terminal 2: Cloudflare Worker local dev (http://localhost:8787)
+npm run worker:dev
 ```
 
-This starts a local Cloudflare Worker using Wrangler with a simulated KV store. The app is available at `http://localhost:8787`.
+Vite proxies `/api` requests to the worker automatically. Open `http://localhost:5173` in your browser.
 
-> **Note**: On first run against a fresh KV the session state defaults to `lobby` and the challenge pool is populated from the bundled JSON content. You can optionally call `POST /api/seed` to explicitly write all content into local KV.
+> **Note**: On first run against a fresh local KV, call `POST /api/seed` to populate content, or rely on the worker's built-in JSON fallback.
 
 ### 3. Seed content (optional, local)
 
@@ -62,14 +68,14 @@ This starts a local Cloudflare Worker using Wrangler with a simulated KV store. 
 curl -X POST http://localhost:8787/api/seed
 ```
 
-This writes all challenges, constraints, and the service catalogue into the local KV namespace and initialises the default game config.
+This writes all challenges, constraints, and the service catalogue into the local KV namespace.
 
 ### 4. Type-check, lint, build
 
 ```bash
 npm run typecheck   # TypeScript across frontend and worker
 npm run lint        # ESLint
-npm run build       # Vite production build → dist/
+npm run build       # Vite + tsc production build → dist/
 ```
 
 ---
@@ -95,7 +101,7 @@ wrangler kv:namespace create GAME_KV
 wrangler kv:namespace create GAME_KV --preview
 ```
 
-Copy the returned `id` and `preview_id` values into `wrangler.toml`:
+Copy the returned `id` and `preview_id` values into `worker/wrangler.toml`:
 
 ```toml
 [[kv_namespaces]]
@@ -108,21 +114,13 @@ preview_id = "<preview-kv-id>"
 
 ```bash
 npm run build
-npm run deploy
+npm run worker:deploy
 ```
 
 ### 3. Seed production content
 
 ```bash
 curl -X POST https://<your-worker-subdomain>.workers.dev/api/seed
-```
-
-### Preview deploys
-
-For preview environments (e.g. from a PR branch), use:
-
-```bash
-wrangler deploy --env preview
 ```
 
 ---
@@ -200,15 +198,24 @@ aws-architecture-challenge/
 │   ├── schema/         # Shared TypeScript types
 │   └── seed/           # Content loader helpers
 ├── src/                # React + Vite frontend
-│   ├── App.tsx         # Main app shell
+│   ├── api/
+│   │   └── client.ts   # Typed API client
+│   ├── hooks/
+│   │   └── useEntry.ts # Player entry state hook
+│   ├── pages/
+│   │   ├── JoinPage.tsx      # QR landing / name entry form
+│   │   └── ChallengePage.tsx # Challenge card, hints, answer reveal
+│   ├── App.tsx         # Root component (routing by entry status)
 │   ├── main.tsx        # React entry point
-│   ├── index.css       # Tailwind CSS
-│   └── types.ts        # API response types
+│   └── index.css       # Tailwind CSS
 ├── worker/
-│   └── index.ts        # Cloudflare Worker with all API routes
+│   ├── index.ts        # Cloudflare Worker with all API routes
+│   ├── tsconfig.json   # Worker-specific TypeScript config
+│   └── wrangler.toml   # Cloudflare deployment config
+├── public/
+│   └── favicon.svg
 ├── docs/
 │   └── game-loop.md    # Full event game loop documentation
-├── wrangler.toml       # Cloudflare deployment config
 └── .github/
     └── workflows/
         └── ci.yml      # CI: typecheck, lint, build on PRs
