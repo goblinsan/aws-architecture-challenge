@@ -5,10 +5,14 @@
  * Sections are collapsible via accordion to reduce vertical scroll on mobile.
  * All sections start open so the full answer is immediately visible on a
  * facilitator's laptop display.
+ *
+ * Core services are displayed as an icon grid (issue #31) with AWS-branded
+ * colour badges and always-visible text labels (issue #32).
  */
 
 import { useState } from "react";
 import type { Answer } from "@content/schema/types";
+import AwsServiceIcon from "./AwsServiceIcon";
 
 interface AccordionSectionProps {
   label: string;
@@ -69,16 +73,15 @@ export default function AnswerPanel({ answer }: AnswerPanelProps) {
         {answer.summary}
       </p>
 
-      {/* Core Services */}
+      {/* Core Services — icon grid with text labels (issues #31 & #32) */}
       <AccordionSection label="Core Services">
-        <div className="flex flex-wrap gap-2">
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))" }}
+          aria-label="Core services used in this architecture"
+        >
           {answer.coreServices.map((s) => (
-            <span
-              key={s}
-              className="bg-aws-dark text-white text-xs font-medium px-2.5 py-1 rounded-full"
-            >
-              {s}
-            </span>
+            <AwsServiceIcon key={s} name={s} size="md" />
           ))}
         </div>
       </AccordionSection>
