@@ -1,5 +1,5 @@
 name = "aws-architecture-challenge"
-main = "index.ts"
+main = "worker/index.ts"
 compatibility_date = "2024-09-03"
 compatibility_flags = ["nodejs_compat"]
 

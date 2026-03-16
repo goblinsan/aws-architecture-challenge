@@ -68,10 +68,7 @@ export default function App() {
     );
   }
 
-  // Default: show join page.
-  // isLoading is always false here: when status is "loading" we return the
-  // full-screen spinner above, so this code is only reached when status is
-  // "join" (or "active" without an entry, which is a transient state).
+  // Default: show join page
   return (
     <JoinPage
       sessionConfig={sessionConfig}
