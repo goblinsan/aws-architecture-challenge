@@ -8,6 +8,11 @@ import type {
   HintTier,
 } from "../content/schema/types";
 
+// Cache game content at module level — it's bundled JSON, so this is free.
+const GAME_CONTENT = loadGameContent();
+
+const VALID_ROUND_STATES: RoundState[] = ["lobby", "design_active", "answer_revealed", "reset"];
+
 export interface Env {
   GAME_KV: KVNamespace;
   ASSETS: Fetcher;
@@ -58,17 +63,40 @@ function errorResponse(message: string, status = 400): Response {
 // Default game config
 // ---------------------------------------------------------------------------
 
-function defaultConfig(challenges: ChallengeCard[]): GameConfig {
+function defaultConfig(): GameConfig {
   return {
     mode: "single",
     assignmentStrategy: "round-robin",
-    challengePool: challenges.map((c) => c.id),
+    challengePool: GAME_CONTENT.challenges.map((c) => c.id),
   };
 }
 
 // ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
+
+async function getRoundState(env: Env): Promise<RoundState> {
+  const raw = await env.GAME_KV.get(KV_SESSION_STATE);
+  if (raw && (VALID_ROUND_STATES as string[]).includes(raw)) {
+    return raw as RoundState;
+  }
+  return "lobby";
+}
+
+async function getConfig(env: Env): Promise<GameConfig> {
+  const raw = await env.GAME_KV.get(KV_SESSION_CONFIG);
+  return raw ? (JSON.parse(raw) as GameConfig) : defaultConfig();
+}
+
+function getChallengeFromContent(challengeId: string): ChallengeCard | null {
+  return GAME_CONTENT.challenges.find((c) => c.id === challengeId) ?? null;
+}
+
+async function getChallengeById(challengeId: string, env: Env): Promise<ChallengeCard | null> {
+  const raw = await env.GAME_KV.get(kvChallengeKey(challengeId));
+  if (raw) return JSON.parse(raw) as ChallengeCard;
+  return getChallengeFromContent(challengeId);
+}
 
 async function handlePostEntries(request: Request, env: Env): Promise<Response> {
   const body = (await request.json()) as {
@@ -81,39 +109,20 @@ async function handlePostEntries(request: Request, env: Env): Promise<Response> 
   }
 
   // Check session state
-  const roundState = ((await env.GAME_KV.get(KV_SESSION_STATE)) ?? "lobby") as RoundState;
+  const roundState = await getRoundState(env);
   if (roundState !== "lobby") {
     return errorResponse("Session is not accepting new entries right now", 409);
   }
 
-  // Load config
-  const configRaw = await env.GAME_KV.get(KV_SESSION_CONFIG);
-  let config: GameConfig;
-  if (configRaw) {
-    config = JSON.parse(configRaw) as GameConfig;
-  } else {
-    const content = loadGameContent();
-    config = defaultConfig(content.challenges);
-  }
-
-  // Increment entry count
+  // Load config and increment entry count
+  const config = await getConfig(env);
   const countRaw = await env.GAME_KV.get(KV_SESSION_ENTRY_COUNT);
   const entryIndex = countRaw ? parseInt(countRaw, 10) : 0;
   await env.GAME_KV.put(KV_SESSION_ENTRY_COUNT, String(entryIndex + 1));
 
-  // Assign challenge
+  // Assign and load challenge
   const challengeId = assignChallenge(config.challengePool, entryIndex);
-
-  // Load challenge from KV (or from static content)
-  let challenge: ChallengeCard | null = null;
-  const challengeRaw = await env.GAME_KV.get(kvChallengeKey(challengeId));
-  if (challengeRaw) {
-    challenge = JSON.parse(challengeRaw) as ChallengeCard;
-  } else {
-    const content = loadGameContent();
-    challenge = content.challenges.find((c) => c.id === challengeId) ?? null;
-  }
-
+  const challenge = await getChallengeById(challengeId, env);
   if (!challenge) {
     return errorResponse(`Challenge ${challengeId} not found`, 500);
   }
@@ -137,16 +146,10 @@ async function handleGetEntry(entryId: string, env: Env): Promise<Response> {
   if (!entryRaw) return errorResponse("Entry not found", 404);
 
   const entry = JSON.parse(entryRaw) as PlayerEntry;
-  const roundState = ((await env.GAME_KV.get(KV_SESSION_STATE)) ?? "lobby") as RoundState;
-
-  let challenge: ChallengeCard | null = null;
-  const challengeRaw = await env.GAME_KV.get(kvChallengeKey(entry.assignedChallengeId));
-  if (challengeRaw) {
-    challenge = JSON.parse(challengeRaw) as ChallengeCard;
-  } else {
-    const content = loadGameContent();
-    challenge = content.challenges.find((c) => c.id === entry.assignedChallengeId) ?? null;
-  }
+  const [roundState, challenge] = await Promise.all([
+    getRoundState(env),
+    getChallengeById(entry.assignedChallengeId, env),
+  ]);
 
   if (!challenge) return errorResponse("Challenge not found", 404);
 
@@ -179,23 +182,21 @@ async function handleRevealHint(
 }
 
 async function handleGetSession(env: Env): Promise<Response> {
-  const roundState = ((await env.GAME_KV.get(KV_SESSION_STATE)) ?? "lobby") as RoundState;
-  const countRaw = await env.GAME_KV.get(KV_SESSION_ENTRY_COUNT);
+  const [roundState, config, countRaw] = await Promise.all([
+    getRoundState(env),
+    getConfig(env),
+    env.GAME_KV.get(KV_SESSION_ENTRY_COUNT),
+  ]);
   const entryCount = countRaw ? parseInt(countRaw, 10) : 0;
-  const configRaw = await env.GAME_KV.get(KV_SESSION_CONFIG);
-  const config = configRaw
-    ? (JSON.parse(configRaw) as GameConfig)
-    : defaultConfig(loadGameContent().challenges);
 
   return jsonResponse({ roundState, entryCount, config });
 }
 
 async function handlePostSessionState(request: Request, env: Env): Promise<Response> {
   const body = (await request.json()) as { state?: RoundState };
-  const validStates: RoundState[] = ["lobby", "design_active", "answer_revealed", "reset"];
 
-  if (!body.state || !validStates.includes(body.state)) {
-    return errorResponse(`state must be one of: ${validStates.join(", ")}`);
+  if (!body.state || !(VALID_ROUND_STATES as string[]).includes(body.state)) {
+    return errorResponse(`state must be one of: ${VALID_ROUND_STATES.join(", ")}`);
   }
 
   await env.GAME_KV.put(KV_SESSION_STATE, body.state);
@@ -203,31 +204,26 @@ async function handlePostSessionState(request: Request, env: Env): Promise<Respo
 }
 
 async function handlePostSessionReset(env: Env): Promise<Response> {
-  // List and delete all entry keys
   const list = await env.GAME_KV.list({ prefix: "entry:" });
   await Promise.all(list.keys.map((k) => env.GAME_KV.delete(k.name)));
 
-  // Reset state and count
-  await env.GAME_KV.put(KV_SESSION_STATE, "lobby");
-  await env.GAME_KV.put(KV_SESSION_ENTRY_COUNT, "0");
+  await Promise.all([
+    env.GAME_KV.put(KV_SESSION_STATE, "lobby"),
+    env.GAME_KV.put(KV_SESSION_ENTRY_COUNT, "0"),
+  ]);
 
   return jsonResponse({ ok: true });
 }
 
 async function handlePostSeed(env: Env): Promise<Response> {
-  const content = loadGameContent();
+  const content = GAME_CONTENT;
 
-  // Seed challenges
-  await Promise.all(
-    content.challenges.map((c) =>
-      env.GAME_KV.put(kvChallengeKey(c.id), JSON.stringify(c))
-    )
-  );
-
-  // Seed constraints, catalogue, and default config
-  await env.GAME_KV.put("constraints", JSON.stringify(content.constraints));
-  await env.GAME_KV.put("catalogue", JSON.stringify(content.serviceCatalogue));
-  await env.GAME_KV.put(KV_SESSION_CONFIG, JSON.stringify(defaultConfig(content.challenges)));
+  await Promise.all([
+    ...content.challenges.map((c) => env.GAME_KV.put(kvChallengeKey(c.id), JSON.stringify(c))),
+    env.GAME_KV.put("constraints", JSON.stringify(content.constraints)),
+    env.GAME_KV.put("catalogue", JSON.stringify(content.serviceCatalogue)),
+    env.GAME_KV.put(KV_SESSION_CONFIG, JSON.stringify(defaultConfig())),
+  ]);
 
   return jsonResponse({ ok: true, seededChallenges: content.challenges.length });
 }

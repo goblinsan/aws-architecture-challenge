@@ -58,7 +58,7 @@ export default function App() {
         loading: false,
         error: null,
       });
-      setRevealedTiers([]);
+      setRevealedTiers(data.entry.revealedHintTiers.map((t) => t as number));
     } catch (err) {
       setState((s) => ({
         ...s,
