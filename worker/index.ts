@@ -2,7 +2,7 @@
  * Cloudflare Worker – AWS Architecture Challenge API
  *
  * Handles anonymous player entry creation, challenge assignment, hint
- * reveals, session state management, and KV seeding.
+ * reveals, session state management, KV seeding, and lightweight analytics.
  *
  * Routes
  * ------
@@ -13,16 +13,22 @@
  * POST /api/session/state        – Update round state (facilitator)
  * POST /api/session/reset        – Reset session and clear all entries
  * POST /api/seed                 – Seed game content into KV
+ * GET  /api/analytics            – Aggregate event analytics (privacy-light)
+ * POST /api/log                  – Client error reporting
  *
  * KV Keys
  * -------
- * session:config   → GameConfig JSON
- * session:state    → RoundState string
- * session:counter  → integer string, incremented per new entry (round-robin)
- * entry:{entryId}  → PlayerEntry JSON
- * challenge:{id}   → ChallengeCard JSON (seeded)
- * constraints      → ConstraintTag[] JSON (seeded)
- * catalogue        → ServiceCatalogue JSON (seeded)
+ * session:config                  → GameConfig JSON
+ * session:state                   → RoundState string
+ * session:counter                 → integer string, incremented per new entry (round-robin)
+ * entry:{entryId}                 → PlayerEntry JSON
+ * challenge:{id}                  → ChallengeCard JSON (seeded)
+ * constraints                     → ConstraintTag[] JSON (seeded)
+ * catalogue                       → ServiceCatalogue JSON (seeded)
+ * analytics:join_count            → integer string
+ * analytics:challenge:{id}        → integer string (assignments per challenge)
+ * analytics:hint:{tier}           → integer string (reveals per tier)
+ * analytics:answer_reveals        → integer string
  */
 
 import type {
@@ -35,6 +41,50 @@ import { loadGameContent } from "../content/seed/index";
 
 // Cache game content at module level — bundled JSON, no network needed.
 const GAME_CONTENT = loadGameContent();
+
+// ---------------------------------------------------------------------------
+// Structured logging
+// ---------------------------------------------------------------------------
+
+/**
+ * Emit a structured JSON log line to the Workers runtime console.
+ * These lines appear in the Cloudflare dashboard → Workers → Logs and in
+ * `wrangler tail`, giving enough context to diagnose event-day issues quickly.
+ */
+function logEvent(
+  level: "info" | "warn" | "error",
+  event: string,
+  data: Record<string, unknown> = {}
+): void {
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    level,
+    event,
+    ...data,
+  });
+  if (level === "error") {
+    console.error(line);
+  } else if (level === "warn") {
+    console.warn(line);
+  } else {
+    console.log(line);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Analytics helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Increment a KV counter key by 1.
+ * Uses optimistic read-modify-write. Occasional under-counting under high
+ * concurrency is acceptable for lightweight event analytics.
+ */
+async function incrementCounter(env: Env, key: string): Promise<void> {
+  const raw = await env.GAME_KV.get(key);
+  const current = raw ? parseInt(raw, 10) : 0;
+  await env.GAME_KV.put(key, String(current + 1));
+}
 
 const VALID_ROUND_STATES: RoundState[] = [
   "lobby",
@@ -277,6 +327,19 @@ async function handleJoin(
     expirationTtl: ENTRY_TTL_SECONDS,
   });
 
+  // Analytics: increment join count and per-challenge assignment counter.
+  void Promise.all([
+    incrementCounter(env, "analytics:join_count"),
+    incrementCounter(env, `analytics:challenge:${assignedChallengeId}`),
+  ]);
+
+  logEvent("info", "player_joined", {
+    entryId,
+    assignedChallengeId,
+    mode: config.mode,
+    strategy: config.assignmentStrategy,
+  });
+
   return jsonResponse(entry, 201, origin);
 }
 
@@ -317,7 +380,8 @@ async function handleRevealHint(
 
   const entry = JSON.parse(raw) as PlayerEntry;
 
-  if (!entry.revealedHintTiers.includes(tier as HintTier)) {
+  const tierNotYetRevealed = !entry.revealedHintTiers.includes(tier as HintTier);
+  if (tierNotYetRevealed) {
     entry.revealedHintTiers = [
       ...entry.revealedHintTiers,
       tier as HintTier,
@@ -325,6 +389,9 @@ async function handleRevealHint(
     await env.GAME_KV.put(entryKey(entryId), JSON.stringify(entry), {
       expirationTtl: ENTRY_TTL_SECONDS,
     });
+    // Analytics: increment per-tier hint reveal counter.
+    void incrementCounter(env, `analytics:hint:${tier}`);
+    logEvent("info", "hint_revealed", { entryId, tier });
   }
 
   return jsonResponse({ revealedHintTiers: entry.revealedHintTiers }, 200, origin);
@@ -357,6 +424,13 @@ async function handlePostSessionState(
   }
 
   await env.GAME_KV.put(KV_SESSION_STATE, state);
+
+  // Analytics: track answer reveal transitions.
+  if (state === "answer_revealed") {
+    void incrementCounter(env, "analytics:answer_reveals");
+  }
+  logEvent("info", "session_state_changed", { state });
+
   return jsonResponse({ state }, 200, origin);
 }
 
@@ -373,6 +447,8 @@ async function handleSessionReset(
     env.GAME_KV.put(KV_SESSION_STATE, "lobby"),
     env.GAME_KV.put(KV_SESSION_COUNTER, "0"),
   ]);
+
+  logEvent("info", "session_reset", { deletedEntries: list.keys.length });
 
   return jsonResponse({ ok: true }, 200, origin);
 }
@@ -399,6 +475,83 @@ async function handleSeed(
   );
 }
 
+/** GET /api/analytics */
+async function handleGetAnalytics(
+  env: Env,
+  origin: string | null
+): Promise<Response> {
+  const challengeIds = GAME_CONTENT.challenges.map((c) => c.id);
+
+  const [joinCountRaw, answerRevealsRaw, hint1Raw, hint2Raw, hint3Raw, ...challengeCountsRaw] =
+    await Promise.all([
+      env.GAME_KV.get("analytics:join_count"),
+      env.GAME_KV.get("analytics:answer_reveals"),
+      env.GAME_KV.get("analytics:hint:1"),
+      env.GAME_KV.get("analytics:hint:2"),
+      env.GAME_KV.get("analytics:hint:3"),
+      ...challengeIds.map((id) => env.GAME_KV.get(`analytics:challenge:${id}`)),
+    ]);
+
+  const challengeAssignments: Record<string, number> = {};
+  challengeIds.forEach((id, i) => {
+    challengeAssignments[id] = challengeCountsRaw[i]
+      ? parseInt(challengeCountsRaw[i] as string, 10)
+      : 0;
+  });
+
+  return jsonResponse(
+    {
+      joinCount: joinCountRaw ? parseInt(joinCountRaw, 10) : 0,
+      answerReveals: answerRevealsRaw ? parseInt(answerRevealsRaw, 10) : 0,
+      hintReveals: {
+        tier1: hint1Raw ? parseInt(hint1Raw, 10) : 0,
+        tier2: hint2Raw ? parseInt(hint2Raw, 10) : 0,
+        tier3: hint3Raw ? parseInt(hint3Raw, 10) : 0,
+      },
+      challengeAssignments,
+    },
+    200,
+    origin
+  );
+}
+
+/** POST /api/log – receive client-side error reports and emit to worker logs */
+async function handleClientLog(
+  request: Request,
+  _env: Env,
+  origin: string | null
+): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse("Invalid JSON body", 400, origin);
+  }
+
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return errorResponse("Request body must be a JSON object", 400, origin);
+  }
+
+  const { level, message, context } = body as {
+    level?: unknown;
+    message?: unknown;
+    context?: unknown;
+  };
+
+  const safeLevel =
+    level === "warn" ? "warn" : level === "error" ? "error" : "info";
+  const safeMessage =
+    typeof message === "string" ? message.slice(0, 500) : "client error";
+
+  logEvent(safeLevel, "client_error_report", {
+    message: safeMessage,
+    context:
+      context !== null && typeof context === "object" ? context : undefined,
+  });
+
+  return jsonResponse({ ok: true }, 200, origin);
+}
+
 // ---------------------------------------------------------------------------
 // Main fetch handler
 // ---------------------------------------------------------------------------
@@ -415,42 +568,59 @@ export default {
 
     const { pathname } = url;
 
-    if (pathname === "/api/session" && request.method === "GET") {
-      return handleGetSession(env, origin);
-    }
+    try {
+      if (pathname === "/api/session" && request.method === "GET") {
+        return await handleGetSession(env, origin);
+      }
 
-    if (pathname === "/api/session/state" && request.method === "POST") {
-      return handlePostSessionState(request, env, origin);
-    }
+      if (pathname === "/api/session/state" && request.method === "POST") {
+        return await handlePostSessionState(request, env, origin);
+      }
 
-    if (pathname === "/api/session/reset" && request.method === "POST") {
-      return handleSessionReset(env, origin);
-    }
+      if (pathname === "/api/session/reset" && request.method === "POST") {
+        return await handleSessionReset(env, origin);
+      }
 
-    if (pathname === "/api/join" && request.method === "POST") {
-      return handleJoin(request, env, origin);
-    }
+      if (pathname === "/api/join" && request.method === "POST") {
+        return await handleJoin(request, env, origin);
+      }
 
-    if (pathname === "/api/seed" && request.method === "POST") {
-      return handleSeed(env, origin);
-    }
+      if (pathname === "/api/seed" && request.method === "POST") {
+        return await handleSeed(env, origin);
+      }
 
-    const entryMatch = pathname.match(/^\/api\/entry\/([^/]+)$/);
-    if (entryMatch && request.method === "GET") {
-      return handleGetEntry(entryMatch[1], env, origin);
-    }
+      if (pathname === "/api/analytics" && request.method === "GET") {
+        return await handleGetAnalytics(env, origin);
+      }
 
-    const hintMatch = pathname.match(/^\/api\/entry\/([^/]+)\/hints\/(\d+)$/);
-    if (hintMatch && request.method === "POST") {
-      return handleRevealHint(hintMatch[1], hintMatch[2], env, origin);
-    }
+      if (pathname === "/api/log" && request.method === "POST") {
+        return await handleClientLog(request, env, origin);
+      }
 
-    // For unknown /api/* routes return 404; everything else is served as a
-    // static asset (including SPA index.html fallback for client-side routes).
-    if (pathname.startsWith("/api/")) {
-      return errorResponse("Not found", 404, origin);
-    }
+      const entryMatch = pathname.match(/^\/api\/entry\/([^/]+)$/);
+      if (entryMatch && request.method === "GET") {
+        return await handleGetEntry(entryMatch[1], env, origin);
+      }
 
-    return env.ASSETS.fetch(request);
+      const hintMatch = pathname.match(/^\/api\/entry\/([^/]+)\/hints\/(\d+)$/);
+      if (hintMatch && request.method === "POST") {
+        return await handleRevealHint(hintMatch[1], hintMatch[2], env, origin);
+      }
+
+      // For unknown /api/* routes return 404; everything else is served as a
+      // static asset (including SPA index.html fallback for client-side routes).
+      if (pathname.startsWith("/api/")) {
+        return errorResponse("Not found", 404, origin);
+      }
+
+      return env.ASSETS.fetch(request);
+    } catch (err) {
+      logEvent("error", "unhandled_request_error", {
+        pathname,
+        method: request.method,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return errorResponse("Internal server error", 500, origin);
+    }
   },
 };
