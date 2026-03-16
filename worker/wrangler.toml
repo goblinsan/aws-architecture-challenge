@@ -1,0 +1,18 @@
+name = "aws-architecture-challenge"
+main = "worker/index.ts"
+compatibility_date = "2024-09-03"
+compatibility_flags = ["nodejs_compat"]
+
+# KV namespace for game session state and player entries.
+# Create with: wrangler kv namespace create GAME_KV
+[[kv_namespaces]]
+binding = "GAME_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_YOUR_PREVIEW_KV_NAMESPACE_ID"
+
+[vars]
+# Default session configuration used when no facilitator has configured the
+# session yet. Override by writing "session:config" to GAME_KV at runtime.
+DEFAULT_CHALLENGE_POOL = "payments-processing,analytics-ingestion,event-driven-onboarding,media-processing,global-customer-support,iot-telemetry,internal-api-platform"
+DEFAULT_MODE = "single"
+DEFAULT_ASSIGNMENT_STRATEGY = "round-robin"
