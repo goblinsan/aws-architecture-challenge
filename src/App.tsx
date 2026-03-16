@@ -12,8 +12,16 @@
 import { useEntry } from "./hooks/useEntry";
 import JoinPage from "./pages/JoinPage";
 import ChallengePage from "./pages/ChallengePage";
+import AdminPage from "./pages/AdminPage";
+import QRPage from "./pages/QRPage";
 
 export default function App() {
+  const path = window.location.pathname;
+
+  // Standalone pages that don't need player entry state.
+  if (path === "/admin") return <AdminPage />;
+  if (path === "/qr") return <QRPage />;
+
   const {
     status,
     entry,

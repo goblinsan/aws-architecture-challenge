@@ -475,6 +475,42 @@ async function handleSeed(
   );
 }
 
+/** GET /api/admin/entries – list all active player entries for the admin dashboard */
+async function handleAdminEntries(
+  env: Env,
+  origin: string | null
+): Promise<Response> {
+  const list = await env.GAME_KV.list({ prefix: "entry:" });
+  const entries: PlayerEntry[] = [];
+  for (const key of list.keys) {
+    const raw = await env.GAME_KV.get(key.name);
+    if (raw) {
+      entries.push(JSON.parse(raw) as PlayerEntry);
+    }
+  }
+  // Map challenge titles from bundled content for convenience.
+  const challengeMap: Record<string, string> = {};
+  for (const c of GAME_CONTENT.challenges) {
+    challengeMap[c.id] = c.title;
+  }
+  return jsonResponse({ entries, challengeMap }, 200, origin);
+}
+
+/** GET /api/admin/challenges – list all available challenge use cases */
+async function handleAdminChallenges(
+  _env: Env,
+  origin: string | null
+): Promise<Response> {
+  const challenges = GAME_CONTENT.challenges.map((c) => ({
+    id: c.id,
+    title: c.title,
+    difficulty: c.difficulty,
+    scenario: c.scenario,
+    constraints: c.constraints,
+  }));
+  return jsonResponse({ challenges }, 200, origin);
+}
+
 /** GET /api/analytics */
 async function handleGetAnalytics(
   env: Env,
@@ -591,6 +627,14 @@ export default {
 
       if (pathname === "/api/analytics" && request.method === "GET") {
         return await handleGetAnalytics(env, origin);
+      }
+
+      if (pathname === "/api/admin/entries" && request.method === "GET") {
+        return await handleAdminEntries(env, origin);
+      }
+
+      if (pathname === "/api/admin/challenges" && request.method === "GET") {
+        return await handleAdminChallenges(env, origin);
       }
 
       if (pathname === "/api/log" && request.method === "POST") {

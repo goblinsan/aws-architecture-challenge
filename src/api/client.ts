@@ -4,7 +4,7 @@
  * All functions throw on network errors. Callers should wrap in try/catch.
  */
 
-import type { GameConfig, PlayerEntry, RoundState, HintTier } from "@content/schema/types";
+import type { GameConfig, PlayerEntry, RoundState, HintTier, Difficulty, ConstraintId } from "@content/schema/types";
 
 // ---------------------------------------------------------------------------
 // Response shapes returned by the worker
@@ -106,4 +106,41 @@ export function reportError(
   }).catch(() => {
     // Silently ignore failures in error reporting to avoid recursive loops.
   });
+}
+
+// ---------------------------------------------------------------------------
+// Admin API calls
+// ---------------------------------------------------------------------------
+
+export interface AdminEntriesResponse {
+  entries: PlayerEntry[];
+  challengeMap: Record<string, string>;
+}
+
+export interface AdminChallenge {
+  id: string;
+  title: string;
+  difficulty: Difficulty;
+  scenario: string;
+  constraints: ConstraintId[];
+}
+
+export interface AdminChallengesResponse {
+  challenges: AdminChallenge[];
+}
+
+export async function fetchAdminEntries(): Promise<AdminEntriesResponse> {
+  const res = await fetch("/api/admin/entries");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch admin entries: ${res.status}`);
+  }
+  return res.json() as Promise<AdminEntriesResponse>;
+}
+
+export async function fetchAdminChallenges(): Promise<AdminChallengesResponse> {
+  const res = await fetch("/api/admin/challenges");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch challenges: ${res.status}`);
+  }
+  return res.json() as Promise<AdminChallengesResponse>;
 }

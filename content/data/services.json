@@ -395,6 +395,42 @@
       ]
     },
     {
+      "id": "elb",
+      "name": "Elastic Load Balancing",
+      "category": "networking",
+      "description": "Automatically distributes incoming traffic across multiple targets — EC2 instances, containers, Lambda functions, or IP addresses — across Availability Zones.",
+      "keyUseCases": [
+        "Application Load Balancer (ALB) for HTTP/HTTPS traffic with path-based and host-based routing",
+        "Network Load Balancer (NLB) for ultra-low-latency TCP/UDP traffic handling millions of requests per second",
+        "Gateway Load Balancer (GWLB) for deploying third-party virtual appliances such as firewalls at scale",
+        "Health checks and automatic failover to healthy targets for high availability"
+      ]
+    },
+    {
+      "id": "cloudfront",
+      "name": "Amazon CloudFront",
+      "category": "networking",
+      "description": "Global content delivery network (CDN) that caches and delivers content from edge locations closest to users for low-latency access.",
+      "keyUseCases": [
+        "Accelerating static and dynamic web content delivery with global edge caching",
+        "HTTPS termination and DDoS protection at the edge with AWS Shield integration",
+        "Origin failover to a secondary origin for high availability during origin outages",
+        "Lambda@Edge and CloudFront Functions for request/response manipulation at the edge"
+      ]
+    },
+    {
+      "id": "nat-gateway",
+      "name": "NAT Gateway",
+      "category": "networking",
+      "description": "Managed network address translation service that enables instances in private subnets to connect to the internet while preventing inbound connections.",
+      "keyUseCases": [
+        "Allowing Lambda functions or containers in private subnets to reach external APIs and package registries",
+        "Outbound internet access for private EC2 instances to download patches and updates",
+        "Replacing self-managed NAT instances with a fully managed, highly available alternative",
+        "Per-AZ deployment for fault-tolerant outbound connectivity"
+      ]
+    },
+    {
       "id": "cloudwatch",
       "name": "Amazon CloudWatch",
       "category": "observability",

@@ -86,6 +86,8 @@ export const SERVICE_ICONS: Record<string, AwsIconConfig> = {
   "global-accelerator": { abbr: "GA",   color: "#8C4FFF", textColor: "#fff" },
   privatelink:          { abbr: "PL",   color: "#8C4FFF", textColor: "#fff" },
   cloudfront:           { abbr: "CF",   color: "#8C4FFF", textColor: "#fff" },
+  elb:                  { abbr: "ELB",  color: "#8C4FFF", textColor: "#fff" },
+  "nat-gateway":        { abbr: "NAT",  color: "#8C4FFF", textColor: "#fff" },
 
   // Observability
   cloudwatch:           { abbr: "CW",   color: "#E7157B", textColor: "#fff" },
@@ -161,6 +163,10 @@ export const SERVICE_NAME_TO_ID: Record<string, string> = {
   "aws global accelerator":             "global-accelerator",
   "aws privatelink":                    "privatelink",
   "amazon cloudfront":                  "cloudfront",
+  "elastic load balancing":             "elb",
+  "application load balancer":          "elb",
+  "network load balancer":              "elb",
+  "nat gateway":                        "nat-gateway",
 
   // Observability
   "amazon cloudwatch":                  "cloudwatch",
