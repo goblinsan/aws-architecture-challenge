@@ -475,6 +475,20 @@ async function handleSeed(
   );
 }
 
+/** DELETE /api/admin/entry/:entryId – remove a single player entry */
+async function handleDeleteEntry(
+  entryId: string,
+  env: Env,
+  origin: string | null
+): Promise<Response> {
+  if (!entryId || entryId.trim() === "") {
+    return errorResponse("entryId is required", 400, origin);
+  }
+  await env.GAME_KV.delete(entryKey(entryId));
+  logEvent("info", "entry_deleted", { entryId });
+  return jsonResponse({ ok: true }, 200, origin);
+}
+
 /** GET /api/admin/entries – list all active player entries for the admin dashboard */
 async function handleAdminEntries(
   env: Env,
@@ -507,6 +521,7 @@ async function handleAdminChallenges(
     difficulty: c.difficulty,
     scenario: c.scenario,
     constraints: c.constraints,
+    answer: c.answer,
   }));
   return jsonResponse({ challenges }, 200, origin);
 }
@@ -635,6 +650,11 @@ export default {
 
       if (pathname === "/api/admin/challenges" && request.method === "GET") {
         return await handleAdminChallenges(env, origin);
+      }
+
+      const adminEntryMatch = pathname.match(/^\/api\/admin\/entry\/([^/]+)$/);
+      if (adminEntryMatch && request.method === "DELETE") {
+        return await handleDeleteEntry(adminEntryMatch[1], env, origin);
       }
 
       if (pathname === "/api/log" && request.method === "POST") {

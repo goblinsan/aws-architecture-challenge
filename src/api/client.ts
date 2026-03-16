@@ -4,7 +4,7 @@
  * All functions throw on network errors. Callers should wrap in try/catch.
  */
 
-import type { GameConfig, PlayerEntry, RoundState, HintTier, Difficulty, ConstraintId } from "@content/schema/types";
+import type { GameConfig, PlayerEntry, RoundState, HintTier, Difficulty, ConstraintId, Answer } from "@content/schema/types";
 
 // ---------------------------------------------------------------------------
 // Response shapes returned by the worker
@@ -123,6 +123,7 @@ export interface AdminChallenge {
   difficulty: Difficulty;
   scenario: string;
   constraints: ConstraintId[];
+  answer: Answer;
 }
 
 export interface AdminChallengesResponse {
@@ -143,4 +144,13 @@ export async function fetchAdminChallenges(): Promise<AdminChallengesResponse> {
     throw new Error(`Failed to fetch challenges: ${res.status}`);
   }
   return res.json() as Promise<AdminChallengesResponse>;
+}
+
+export async function deleteAdminEntry(entryId: string): Promise<void> {
+  const res = await fetch(`/api/admin/entry/${encodeURIComponent(entryId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete entry: ${res.status}`);
+  }
 }
