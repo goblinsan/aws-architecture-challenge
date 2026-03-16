@@ -12,14 +12,21 @@
  *   1. POSTs to the worker to create a new entry.
  *   2. Persists the entry ID in localStorage for re-entry.
  *   3. Exposes the full PlayerEntry object.
+ *
+ * While active:
+ *   - Polls /api/session every 5 seconds to pick up facilitator state changes
+ *     (answer reveal, reset) without requiring a page refresh.
  */
 
 import { useState, useEffect, useCallback } from "react";
 import type { PlayerEntry, GameConfig, RoundState } from "@content/schema/types";
-import { fetchSession, fetchEntry, joinSession } from "../api/client";
+import { fetchSession, fetchEntry, joinSession, reportError } from "../api/client";
 
 // localStorage key for the persisted entry ID.
 const STORAGE_KEY = "awsarch_entry_id";
+
+// How often to poll for session state changes when a player is active (ms).
+const POLL_INTERVAL_MS = 5000;
 
 export type EntryStatus =
   | "loading"    // Checking localStorage / fetching session
@@ -37,6 +44,8 @@ export interface UseEntryResult {
   join: (names: string | [string, string]) => Promise<void>;
   /** Clear the stored entry and return to the join form. */
   clearEntry: () => void;
+  /** Re-run the initial load sequence after an error (avoids full page reload). */
+  retryLoad: () => void;
 }
 
 export function useEntry(): UseEntryResult {
@@ -45,6 +54,18 @@ export function useEntry(): UseEntryResult {
   const [sessionConfig, setSessionConfig] = useState<GameConfig | null>(null);
   const [roundState, setRoundState] = useState<RoundState | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Incrementing this key re-triggers the init effect without a page reload.
+  const [loadKey, setLoadKey] = useState(0);
+
+  // ---------------------------------------------------------------------------
+  // Clear entry (facilitator reset or manual re-join)
+  // ---------------------------------------------------------------------------
+  const clearEntry = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    setEntry(null);
+    setStatus("join");
+    setErrorMessage(null);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Initialise: load session config and attempt re-entry
@@ -53,6 +74,7 @@ export function useEntry(): UseEntryResult {
     let cancelled = false;
 
     async function init() {
+      setStatus("loading");
       try {
         // Always fetch session config first (needed to render join form correctly).
         const session = await fetchSession();
@@ -77,9 +99,9 @@ export function useEntry(): UseEntryResult {
         setStatus("join");
       } catch (err) {
         if (cancelled) return;
-        setErrorMessage(
-          err instanceof Error ? err.message : "Failed to load session"
-        );
+        const message = err instanceof Error ? err.message : "Failed to load session";
+        reportError(message, { source: "useEntry.init" });
+        setErrorMessage(message);
         setStatus("error");
       }
     }
@@ -88,6 +110,39 @@ export function useEntry(): UseEntryResult {
     return () => {
       cancelled = true;
     };
+  }, [loadKey]);
+
+  // ---------------------------------------------------------------------------
+  // Poll session state while a player is active
+  // Picks up facilitator transitions (answer_revealed, reset) live.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (status !== "active") return;
+
+    const intervalId = setInterval(() => {
+      void (async () => {
+        try {
+          const session = await fetchSession();
+          setRoundState(session.state);
+          if (session.state === "reset") {
+            clearEntry();
+          }
+        } catch {
+          // Silently swallow polling errors — a transient network blip should
+          // not disrupt the player's current view.
+        }
+      })();
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [status, clearEntry]);
+
+  // ---------------------------------------------------------------------------
+  // Retry: re-run init without a full page reload
+  // ---------------------------------------------------------------------------
+  const retryLoad = useCallback(() => {
+    setErrorMessage(null);
+    setLoadKey((k) => k + 1);
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -113,16 +168,6 @@ export function useEntry(): UseEntryResult {
     []
   );
 
-  // ---------------------------------------------------------------------------
-  // Clear entry (facilitator reset or manual re-join)
-  // ---------------------------------------------------------------------------
-  const clearEntry = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setEntry(null);
-    setStatus("join");
-    setErrorMessage(null);
-  }, []);
-
   return {
     status,
     entry,
@@ -131,5 +176,6 @@ export function useEntry(): UseEntryResult {
     errorMessage,
     join,
     clearEntry,
+    retryLoad,
   };
 }

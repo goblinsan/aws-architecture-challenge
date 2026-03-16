@@ -16,6 +16,7 @@
 import { useState, useEffect } from "react";
 import type { PlayerEntry, RoundState, HintTier } from "@content/schema/types";
 import { loadGameContent } from "@content/seed/index";
+import { revealHintTier } from "../api/client";
 import ConstraintChip from "../components/ConstraintChip";
 import HintPanel from "../components/HintPanel";
 import ServiceCataloguePanel from "../components/ServiceCataloguePanel";
@@ -101,7 +102,13 @@ export default function ChallengePage({
   }, [entry.revealedHintTiers]);
 
   function revealHint(tier: HintTier) {
+    // Optimistically update local state for instant feedback.
     setRevealedTiers((prev) => new Set([...prev, tier]));
+    // Persist to the worker so the reveal survives a page refresh.
+    void revealHintTier(entry.entryId, tier).catch(() => {
+      // Fire-and-forget: a failed persist is non-blocking. The hint remains
+      // visible locally for the rest of the session even if the write fails.
+    });
   }
 
   const displayName = Array.isArray(entry.names)

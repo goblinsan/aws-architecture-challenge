@@ -4,7 +4,7 @@
  * All functions throw on network errors. Callers should wrap in try/catch.
  */
 
-import type { GameConfig, PlayerEntry, RoundState } from "@content/schema/types";
+import type { GameConfig, PlayerEntry, RoundState, HintTier } from "@content/schema/types";
 
 // ---------------------------------------------------------------------------
 // Response shapes returned by the worker
@@ -70,4 +70,40 @@ export async function fetchEntry(entryId: string): Promise<PlayerEntry | null> {
     throw new Error(`Failed to fetch entry: ${res.status}`);
   }
   return res.json() as Promise<PlayerEntry>;
+}
+
+/**
+ * Persist a hint tier reveal to the worker so it survives page refreshes.
+ * Returns the updated list of revealed hint tiers for the entry.
+ */
+export async function revealHintTier(
+  entryId: string,
+  tier: HintTier
+): Promise<HintTier[]> {
+  const res = await fetch(
+    `/api/entry/${encodeURIComponent(entryId)}/hints/${tier}`,
+    { method: "POST" }
+  );
+  if (!res.ok) {
+    throw new Error(`Hint reveal failed: ${res.status}`);
+  }
+  const data = (await res.json()) as { revealedHintTiers: HintTier[] };
+  return data.revealedHintTiers;
+}
+
+/**
+ * Send a client-side error report to the worker for structured logging.
+ * Fire-and-forget — errors in this call are silently swallowed.
+ */
+export function reportError(
+  message: string,
+  context?: Record<string, unknown>
+): void {
+  void fetch("/api/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ level: "error", message, context }),
+  }).catch(() => {
+    // Silently ignore failures in error reporting to avoid recursive loops.
+  });
 }

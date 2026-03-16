@@ -22,6 +22,7 @@ export default function App() {
     errorMessage,
     join,
     clearEntry,
+    retryLoad,
   } = useEntry();
 
   if (status === "loading") {
@@ -49,7 +50,7 @@ export default function App() {
           {errorMessage ?? "Unable to load the session. Please try again."}
         </p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={retryLoad}
           className="rounded-xl bg-aws-orange text-aws-dark font-semibold py-3 px-8"
         >
           Retry
