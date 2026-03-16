@@ -4,6 +4,7 @@ A short-lived, mobile-first TypeScript web app hosted on Cloudflare for a live A
 
 Players join via QR code, receive a unique entry and assigned use case, review constraints and optional hints, sketch an architecture on paper or whiteboard, and then compare their design to a well-architected reference answer at the end of the round.
 
+
 ## Overview
 
 - **Audience**: AWS builders, internal event participants, facilitator / event host
