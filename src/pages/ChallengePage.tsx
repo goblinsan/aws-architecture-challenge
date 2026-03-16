@@ -1,19 +1,25 @@
 /**
  * ChallengePage
  *
- * Displays the player's assigned challenge card. Shows the scenario, constraint
- * tags, and progressive hint tiers. The answer view is shown when the round
- * state is "answer_revealed".
+ * Mobile-first in-round screen with three tabs:
+ *  1. Challenge — scenario, difficulty badge, and constraint chips
+ *  2. Hints     — progressive tiered hints with sequential unlock
+ *  3. Services  — searchable AWS service catalogue grouped by category
  *
- * This is the primary in-round screen and is reached immediately after joining.
- * Players return to this page automatically after a refresh or reconnect because
- * the entry ID is persisted in localStorage.
+ * When the round state is "answer_revealed" all three tabs are replaced by
+ * the full reference-answer panel.
+ *
+ * Layout: sticky top-bar → scrollable content → sticky bottom tab bar.
+ * Tab bar is hidden during the answer-reveal phase.
  */
 
 import { useState, useEffect } from "react";
-import type { PlayerEntry, RoundState } from "@content/schema/types";
+import type { PlayerEntry, RoundState, HintTier } from "@content/schema/types";
 import { loadGameContent } from "@content/seed/index";
-import type { ChallengeCard, ConstraintTag, HintTier } from "@content/schema/types";
+import ConstraintChip from "../components/ConstraintChip";
+import HintPanel from "../components/HintPanel";
+import ServiceCataloguePanel from "../components/ServiceCataloguePanel";
+import AnswerPanel from "../components/AnswerPanel";
 
 interface ChallengePageProps {
   entry: PlayerEntry;
@@ -24,21 +30,65 @@ interface ChallengePageProps {
 // Load the full game content bundle once at module level (no network needed).
 const gameContent = loadGameContent();
 
-function getConstraintLabel(
-  id: string,
-  constraints: ConstraintTag[]
-): string {
-  return constraints.find((c) => c.id === id)?.label ?? id;
+type Tab = "challenge" | "hints" | "services";
+
+// ---------------------------------------------------------------------------
+// Tab bar icons (inline SVG — no external dependency)
+// ---------------------------------------------------------------------------
+
+function ChallengeIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className={`w-5 h-5 ${active ? "fill-aws-orange" : "fill-gray-400"}`}
+      aria-hidden="true"
+    >
+      <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18" />
+    </svg>
+  );
 }
+
+function HintsIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className={`w-5 h-5 ${active ? "fill-aws-orange" : "fill-gray-400"}`}
+      aria-hidden="true"
+    >
+      <path d="M12 2a7 7 0 0 1 4.9 11.9c-.6.6-1.1 1.3-1.3 2.1H8.4c-.2-.8-.7-1.5-1.3-2.1A7 7 0 0 1 12 2zm-1 15h2v2h-2v-2zm0 3h2v1h-2v-1z" />
+    </svg>
+  );
+}
+
+function ServicesIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className={`w-5 h-5 ${active ? "fill-aws-orange" : "fill-gray-400"}`}
+      aria-hidden="true"
+    >
+      <path d="M4 6h4v4H4V6zm6 0h4v4h-4V6zm6 0h4v4h-4V6zM4 12h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 18h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 export default function ChallengePage({
   entry,
   roundState,
   onLeave,
 }: ChallengePageProps) {
-  const card: ChallengeCard | undefined = gameContent.challenges.find(
+  const card = gameContent.challenges.find(
     (c) => c.id === entry.assignedChallengeId
   );
+
+  const [activeTab, setActiveTab] = useState<Tab>("challenge");
 
   // Track which hint tiers have been revealed locally (seeded from entry state).
   const [revealedTiers, setRevealedTiers] = useState<Set<HintTier>>(
@@ -58,6 +108,19 @@ export default function ChallengePage({
     ? entry.names.join(" & ")
     : entry.names;
 
+  const isAnswerRevealed = roundState === "answer_revealed";
+
+  // When the answer is revealed, always switch to the challenge tab so the
+  // answer panel is visible immediately.
+  useEffect(() => {
+    if (isAnswerRevealed) {
+      setActiveTab("challenge");
+    }
+  }, [isAnswerRevealed]);
+
+  // -------------------------------------------------------------------
+  // Challenge-not-found fallback
+  // -------------------------------------------------------------------
   if (!card) {
     return (
       <div className="min-h-screen bg-aws-dark flex items-center justify-center p-6">
@@ -77,21 +140,23 @@ export default function ChallengePage({
     );
   }
 
-  const isAnswerRevealed = roundState === "answer_revealed";
+  // -------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top bar */}
-      <header className="bg-aws-dark px-4 py-3 flex items-center justify-between">
+      {/* ── Sticky top bar ─────────────────────────────────────────── */}
+      <header className="sticky top-0 z-10 bg-aws-dark px-4 py-3 flex items-center justify-between shadow-md">
         <span className="text-aws-orange font-bold text-sm truncate max-w-[60%]">
           {displayName}
         </span>
         <span
-          className={`text-xs font-semibold uppercase tracking-widest px-2 py-1 rounded-full ${
+          className={`text-xs font-semibold uppercase tracking-widest px-2.5 py-1 rounded-full ${
             isAnswerRevealed
-              ? "bg-green-600 text-white"
+              ? "bg-green-500 text-white"
               : roundState === "design_active"
-              ? "bg-yellow-500 text-aws-dark"
+              ? "bg-yellow-400 text-aws-dark"
               : "bg-gray-600 text-gray-200"
           }`}
         >
@@ -103,173 +168,199 @@ export default function ChallengePage({
         </span>
       </header>
 
-      <main className="flex-1 overflow-y-auto">
-        {/* Challenge card */}
-        <section className="bg-white shadow-sm rounded-xl mx-4 mt-4 p-5">
-          {/* Difficulty badge */}
-          <div className="flex items-center gap-2 mb-3">
-            <span
-              className={`text-xs font-medium uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                card.difficulty === "easy"
-                  ? "bg-green-100 text-green-700"
-                  : card.difficulty === "medium"
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-red-100 text-red-700"
-              }`}
-            >
-              {card.difficulty}
-            </span>
-          </div>
-
-          <h2 className="text-xl font-bold text-gray-900 mb-3">{card.title}</h2>
-          <p className="text-gray-700 text-sm leading-relaxed">{card.scenario}</p>
-
-          {/* Constraint tags */}
-          <div className="flex flex-wrap gap-2 mt-4">
-            {card.constraints.map((cid) => (
-              <span
-                key={cid}
-                className="bg-aws-dark text-white text-xs font-medium px-2.5 py-1 rounded-full"
-              >
-                {getConstraintLabel(cid, gameContent.constraints)}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        {/* Hints section (only in design active or lobby) */}
-        {!isAnswerRevealed && (
-          <section className="mx-4 mt-4">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Hints
-            </h3>
-            <div className="space-y-2">
-              {card.hints
-                .slice()
-                .sort((a, b) => a.tier - b.tier)
-                .map((hint) => {
-                  const revealed = revealedTiers.has(hint.tier);
+      {/* ── Scrollable content area ────────────────────────────────── */}
+      <main
+        className="flex-1 overflow-y-auto px-4 pt-4 pb-28"
+        id="main-content"
+      >
+        {/* === ANSWER REVEALED STATE (replaces all tabs) === */}
+        {isAnswerRevealed ? (
+          <section aria-label="Reference answer">
+            {/* Challenge card summary at the top for context */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                    card.difficulty === "easy"
+                      ? "bg-green-100 text-green-700"
+                      : card.difficulty === "medium"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  {card.difficulty}
+                </span>
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-1">
+                {card.title}
+              </h2>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {card.constraints.map((cid) => {
+                  const constraint = gameContent.constraints.find(
+                    (c) => c.id === cid
+                  );
+                  if (!constraint) return null;
                   return (
-                    <div
-                      key={hint.tier}
-                      className="bg-white rounded-xl shadow-sm p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                          Hint {hint.tier}
-                        </span>
-                        {!revealed && (
-                          <button
-                            onClick={() => revealHint(hint.tier)}
-                            className="text-xs text-aws-orange font-semibold underline"
-                          >
-                            Reveal
-                          </button>
-                        )}
-                      </div>
-                      {revealed ? (
-                        <p className="mt-2 text-sm text-gray-700 leading-relaxed">
-                          {hint.text}
-                        </p>
-                      ) : (
-                        <p className="mt-2 text-sm text-gray-300 select-none">
-                          ••••••••••••••••••
-                        </p>
-                      )}
-                    </div>
+                    <ConstraintChip key={cid} constraint={constraint} />
                   );
                 })}
+              </div>
+            </div>
+
+            <AnswerPanel answer={card.answer} />
+
+            <div className="text-center mt-6">
+              <button
+                onClick={onLeave}
+                className="text-xs text-gray-400 underline min-h-[44px] px-4"
+              >
+                Leave session
+              </button>
             </div>
           </section>
-        )}
+        ) : (
+          <>
+            {/* === CHALLENGE TAB === */}
+            {activeTab === "challenge" && (
+              <section aria-label="Challenge overview">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                  {/* Difficulty badge */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span
+                      className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                        card.difficulty === "easy"
+                          ? "bg-green-100 text-green-700"
+                          : card.difficulty === "medium"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {card.difficulty}
+                    </span>
+                  </div>
 
-        {/* Answer section (revealed when facilitator triggers reveal) */}
-        {isAnswerRevealed && (
-          <section className="mx-4 mt-4 pb-8">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Reference Answer
-            </h3>
-            <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
-              <p className="text-sm text-gray-700 leading-relaxed">
-                {card.answer.summary}
-              </p>
+                  {/* Title */}
+                  <h2 className="text-xl font-bold text-gray-900 mb-3">
+                    {card.title}
+                  </h2>
 
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                  Core Services
-                </h4>
-                <ul className="list-disc list-inside space-y-0.5">
-                  {card.answer.coreServices.map((s) => (
-                    <li key={s} className="text-sm text-gray-700">
-                      {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                  {/* Scenario */}
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {card.scenario}
+                  </p>
 
-              {card.answer.optionalVariants.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                    Optional Variants
-                  </h4>
-                  {card.answer.optionalVariants.map((v) => (
-                    <div key={v.title} className="mb-1">
-                      <span className="text-sm font-medium text-gray-800">
-                        {v.title}
-                      </span>
-                      <span className="text-sm text-gray-600"> – {v.description}</span>
+                  {/* Constraint chips */}
+                  <div className="mt-5">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                      Constraints
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {card.constraints.map((cid) => {
+                        const constraint = gameContent.constraints.find(
+                          (c) => c.id === cid
+                        );
+                        if (!constraint) return null;
+                        return (
+                          <ConstraintChip
+                            key={cid}
+                            constraint={constraint}
+                            large
+                          />
+                        );
+                      })}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              )}
+              </section>
+            )}
 
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                  Tradeoffs
-                </h4>
-                <ul className="list-disc list-inside space-y-0.5">
-                  {card.answer.tradeoffs.map((t) => (
-                    <li key={t} className="text-sm text-gray-700">
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {/* === HINTS TAB === */}
+            {activeTab === "hints" && (
+              <section aria-label="Hints">
+                <p className="text-xs text-gray-400 mb-3 leading-relaxed">
+                  Hints are revealed one tier at a time. Use them only when you
+                  need a nudge — earlier tiers keep the challenge fresh.
+                </p>
+                <HintPanel
+                  hints={card.hints}
+                  revealedTiers={revealedTiers}
+                  onReveal={revealHint}
+                />
+              </section>
+            )}
 
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                  Resilience
-                </h4>
-                <p className="text-sm text-gray-700">{card.answer.resilienceNotes}</p>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                  Security
-                </h4>
-                <p className="text-sm text-gray-700">{card.answer.securityNotes}</p>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">
-                  Why It Fits
-                </h4>
-                <p className="text-sm text-gray-700">{card.answer.whyItFits}</p>
-              </div>
-            </div>
-          </section>
+            {/* === SERVICES TAB === */}
+            {activeTab === "services" && (
+              <section aria-label="AWS service catalogue">
+                <ServiceCataloguePanel
+                  catalogue={gameContent.serviceCatalogue}
+                />
+              </section>
+            )}
+          </>
         )}
       </main>
 
-      {/* Footer: leave / re-join link */}
-      <footer className="py-3 text-center border-t border-gray-200">
-        <button
-          onClick={onLeave}
-          className="text-xs text-gray-400 underline"
+      {/* ── Sticky bottom tab bar (hidden when answer revealed) ────── */}
+      {!isAnswerRevealed && (
+        <nav
+          className="fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-200
+                     flex items-stretch shadow-[0_-2px_8px_rgba(0,0,0,0.06)]"
+          aria-label="Navigation tabs"
         >
-          Leave session
-        </button>
-      </footer>
+          {(
+            [
+              {
+                id: "challenge" as Tab,
+                label: "Challenge",
+                Icon: ChallengeIcon,
+              },
+              { id: "hints" as Tab, label: "Hints", Icon: HintsIcon },
+              {
+                id: "services" as Tab,
+                label: "Services",
+                Icon: ServicesIcon,
+              },
+            ] as const
+          ).map(({ id, label, Icon }) => {
+            const isActive = activeTab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                aria-pressed={isActive}
+                aria-controls="main-content"
+                className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 min-h-[56px]
+                            text-xs font-semibold transition-colors
+                            focus:outline-none focus:ring-2 focus:ring-inset focus:ring-aws-orange
+                            ${isActive ? "text-aws-orange" : "text-gray-400"}`}
+              >
+                <Icon active={isActive} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
+
+          {/* Leave session — placed in the bottom bar */}
+          <button
+            onClick={onLeave}
+            className="flex-none flex flex-col items-center justify-center gap-1 py-3 px-4
+                       min-h-[56px] text-xs text-gray-400 font-medium border-l border-gray-100
+                       focus:outline-none focus:ring-2 focus:ring-inset focus:ring-aws-orange"
+            aria-label="Leave session"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              className="w-5 h-5 fill-gray-400"
+              aria-hidden="true"
+            >
+              <path d="M16 13v-2H7V8l-5 4 5 4v-3zM20 3H10c-1.1 0-2 .9-2 2v4h2V5h10v14H10v-4H8v4c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
+            </svg>
+            <span>Leave</span>
+          </button>
+        </nav>
+      )}
     </div>
   );
 }
