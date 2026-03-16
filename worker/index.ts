@@ -49,6 +49,7 @@ const VALID_ROUND_STATES: RoundState[] = [
 
 export interface Env {
   GAME_KV: KVNamespace;
+  ASSETS: Fetcher;
   DEFAULT_CHALLENGE_POOL: string;
   DEFAULT_MODE: string;
   DEFAULT_ASSIGNMENT_STRATEGY: string;
@@ -444,6 +445,12 @@ export default {
       return handleRevealHint(hintMatch[1], hintMatch[2], env, origin);
     }
 
-    return errorResponse("Not found", 404, origin);
+    // For unknown /api/* routes return 404; everything else is served as a
+    // static asset (including SPA index.html fallback for client-side routes).
+    if (pathname.startsWith("/api/")) {
+      return errorResponse("Not found", 404, origin);
+    }
+
+    return env.ASSETS.fetch(request);
   },
 };
