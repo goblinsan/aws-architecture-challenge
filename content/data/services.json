@@ -1,0 +1,494 @@
+{
+  "categories": [
+    "compute",
+    "storage",
+    "databases",
+    "integration",
+    "security",
+    "networking",
+    "observability",
+    "analytics"
+  ],
+  "services": [
+    {
+      "id": "lambda",
+      "name": "AWS Lambda",
+      "category": "compute",
+      "description": "Run code in response to events without provisioning or managing servers, paying only for execution time.",
+      "keyUseCases": [
+        "Event-driven processing triggered by S3, SQS, API Gateway, DynamoDB Streams, or EventBridge",
+        "Backend logic for serverless APIs and microservices",
+        "Data transformation and enrichment in streaming pipelines",
+        "Scheduled automation tasks and operational scripts"
+      ]
+    },
+    {
+      "id": "ecs-fargate",
+      "name": "AWS Fargate (ECS)",
+      "category": "compute",
+      "description": "Run containers without managing the underlying servers or clusters — define CPU and memory and Fargate handles the rest.",
+      "keyUseCases": [
+        "Long-running containerised workloads not suited to Lambda's 15-minute limit",
+        "Microservices that require custom runtimes or binaries",
+        "Batch processing jobs with variable resource requirements",
+        "Lift-and-shift of existing Docker workloads to serverless containers"
+      ]
+    },
+    {
+      "id": "ec2",
+      "name": "Amazon EC2",
+      "category": "compute",
+      "description": "Virtual servers in the cloud with full operating system control, available in hundreds of instance types.",
+      "keyUseCases": [
+        "Workloads requiring specific hardware, OS configuration, or legacy software",
+        "High-performance computing with GPU or HPC instance families",
+        "Spot Instance fleets for cost-optimised batch or rendering workloads",
+        "Stateful applications that cannot run in containers or serverless environments"
+      ]
+    },
+    {
+      "id": "batch",
+      "name": "AWS Batch",
+      "category": "compute",
+      "description": "Run large-scale batch computing jobs across managed EC2 or Fargate compute environments without managing job schedulers.",
+      "keyUseCases": [
+        "High-throughput batch processing such as video transcoding, genomics, or financial simulations",
+        "Scheduled overnight jobs that benefit from Spot Instance pricing",
+        "Data processing pipelines with complex job dependencies and queues",
+        "Scientific computing workloads requiring multi-node parallel execution"
+      ]
+    },
+    {
+      "id": "mediaconvert",
+      "name": "AWS Elemental MediaConvert",
+      "category": "compute",
+      "description": "Transcode video files at scale into multiple formats and resolutions using a fully managed, pay-per-minute service.",
+      "keyUseCases": [
+        "Multi-resolution video transcoding for adaptive bitrate streaming (HLS, DASH)",
+        "Broadcast-grade file-based video processing with professional codec support",
+        "Automated video pipeline triggered by S3 object events",
+        "Caption and subtitle generation and embedding for accessibility"
+      ]
+    },
+    {
+      "id": "s3",
+      "name": "Amazon S3",
+      "category": "storage",
+      "description": "Highly durable object storage for any amount of data, accessible from anywhere via HTTPS.",
+      "keyUseCases": [
+        "Data lake storage for analytics pipelines — store raw, processed, and curated data",
+        "Backup, archive, and disaster recovery with lifecycle policies and Glacier tiering",
+        "Input/output staging for asynchronous processing pipelines (e.g. video upload → transcode)",
+        "Pre-signed URL uploads for secure direct browser-to-S3 file uploads"
+      ]
+    },
+    {
+      "id": "efs",
+      "name": "Amazon EFS",
+      "category": "storage",
+      "description": "Fully managed, elastic NFS file system that scales automatically and can be mounted concurrently by multiple EC2 instances or containers.",
+      "keyUseCases": [
+        "Shared file storage for containerised workloads that need a common filesystem",
+        "Content management systems requiring shared media storage across instances",
+        "Machine learning training jobs sharing large datasets across multiple workers",
+        "Lambda functions requiring persistent shared state beyond the /tmp ephemeral layer"
+      ]
+    },
+    {
+      "id": "ebs",
+      "name": "Amazon EBS",
+      "category": "storage",
+      "description": "Block storage volumes for EC2 instances providing low-latency, high-IOPS persistent storage.",
+      "keyUseCases": [
+        "Database storage for self-managed databases running on EC2 (e.g. PostgreSQL, MySQL)",
+        "Boot volumes and OS storage for EC2 instances",
+        "High-IOPS storage for latency-sensitive applications requiring sub-millisecond access",
+        "Snapshots for point-in-time backup and cross-region disaster recovery"
+      ]
+    },
+    {
+      "id": "dynamodb",
+      "name": "Amazon DynamoDB",
+      "category": "databases",
+      "description": "Fully managed NoSQL database delivering single-digit millisecond performance at any scale.",
+      "keyUseCases": [
+        "Session state, user profiles, and preference storage for high-concurrency applications",
+        "Event sourcing and audit log storage with Time to Live for automatic expiry",
+        "Gaming leaderboards, IoT device state, and real-time voting systems",
+        "Global Tables for multi-region active-active replication without managing replicas"
+      ]
+    },
+    {
+      "id": "aurora",
+      "name": "Amazon Aurora",
+      "category": "databases",
+      "description": "MySQL and PostgreSQL-compatible relational database built for the cloud, offering up to 5x throughput of standard MySQL.",
+      "keyUseCases": [
+        "Transactional workloads requiring ACID guarantees and complex relational queries",
+        "Aurora Serverless v2 for unpredictable workloads that need to scale to zero between bursts",
+        "Global Database for low-latency multi-region reads with fast cross-region replication",
+        "Replacing self-managed RDS with higher availability (6-way replication across 3 AZs)"
+      ]
+    },
+    {
+      "id": "elasticache",
+      "name": "Amazon ElastiCache",
+      "category": "databases",
+      "description": "Managed in-memory caching service compatible with Redis and Memcached for sub-millisecond read performance.",
+      "keyUseCases": [
+        "Database query caching to reduce read load and latency for frequently accessed data",
+        "Session store for stateless web applications requiring fast distributed session lookup",
+        "Rate limiting and token bucket counters using Redis atomic increment operations",
+        "Pub/sub messaging for lightweight real-time event distribution within a single region"
+      ]
+    },
+    {
+      "id": "timestream",
+      "name": "Amazon Timestream",
+      "category": "databases",
+      "description": "Purpose-built serverless time-series database optimised for storing and querying time-stamped IoT and operational data.",
+      "keyUseCases": [
+        "IoT sensor telemetry — temperature, pressure, vibration — with automatic time-based tiering",
+        "Application metrics and operational monitoring data with built-in aggregation functions",
+        "Financial tick data and event-rate analytics with time-window queries",
+        "Replacing self-managed InfluxDB or OpenTSDB with a fully managed alternative"
+      ]
+    },
+    {
+      "id": "rds",
+      "name": "Amazon RDS",
+      "category": "databases",
+      "description": "Managed relational database service supporting MySQL, PostgreSQL, MariaDB, Oracle, and SQL Server.",
+      "keyUseCases": [
+        "Lift-and-shift of existing relational workloads with minimal code changes",
+        "Read Replicas for offloading read-heavy reporting queries from the primary instance",
+        "Multi-AZ deployments for automatic failover and high availability",
+        "Oracle or SQL Server workloads that cannot migrate to Aurora-compatible engines"
+      ]
+    },
+    {
+      "id": "sqs",
+      "name": "Amazon SQS",
+      "category": "integration",
+      "description": "Fully managed message queuing service for decoupling producers from consumers and absorbing traffic bursts.",
+      "keyUseCases": [
+        "Decoupling microservices so a slow consumer does not block the upstream producer",
+        "Absorbing burst traffic — SQS buffers requests while downstream processors catch up",
+        "Dead-letter queues to capture and investigate failed message processing",
+        "FIFO queues for exactly-once processing and strict ordering guarantees"
+      ]
+    },
+    {
+      "id": "sns",
+      "name": "Amazon SNS",
+      "category": "integration",
+      "description": "Fully managed pub/sub messaging for fan-out notifications to multiple subscribers simultaneously.",
+      "keyUseCases": [
+        "Fan-out a single event to multiple SQS queues, Lambda functions, or HTTP endpoints in parallel",
+        "Mobile push notifications to iOS, Android, and web endpoints",
+        "Operational alerts — send SMS or email notifications when CloudWatch alarms trigger",
+        "Cross-application event broadcasting where multiple consumers need the same event"
+      ]
+    },
+    {
+      "id": "eventbridge",
+      "name": "Amazon EventBridge",
+      "category": "integration",
+      "description": "Serverless event bus that routes events between AWS services, custom applications, and SaaS partners using content-based rules.",
+      "keyUseCases": [
+        "Decoupled event-driven architectures where producers and consumers evolve independently",
+        "Scheduled rules (cron) for periodic Lambda invocations without managing cron infrastructure",
+        "SaaS integrations — receive events from Salesforce, Zendesk, or Datadog without polling",
+        "Event replay and archiving to reprocess historical events after consumer failures"
+      ]
+    },
+    {
+      "id": "step-functions",
+      "name": "AWS Step Functions",
+      "category": "integration",
+      "description": "Visual serverless workflow orchestration for coordinating Lambda functions, AWS services, and human approval steps.",
+      "keyUseCases": [
+        "Multi-step business workflows with conditional branching, retries, and parallel execution",
+        "Long-running processes (hours to days) with built-in wait states for human approvals",
+        "Replacing complex error-handling and retry logic in Lambda with declarative state machines",
+        "Saga pattern implementation for distributed transaction coordination across microservices"
+      ]
+    },
+    {
+      "id": "api-gateway",
+      "name": "Amazon API Gateway",
+      "category": "integration",
+      "description": "Fully managed service for creating, publishing, and securing REST, HTTP, and WebSocket APIs at any scale.",
+      "keyUseCases": [
+        "Serverless API front-end backed by Lambda — no servers to manage or scale",
+        "JWT and IAM authorization at the edge before requests reach backend services",
+        "Usage plans and API keys for per-consumer rate limiting and quota enforcement",
+        "WebSocket APIs for real-time two-way communication in chat or live data applications"
+      ]
+    },
+    {
+      "id": "appsync",
+      "name": "AWS AppSync",
+      "category": "integration",
+      "description": "Managed GraphQL API service with real-time subscriptions and offline data sync for web and mobile apps.",
+      "keyUseCases": [
+        "GraphQL APIs where clients fetch exactly the data shape they need in a single request",
+        "Real-time subscriptions for live dashboards, chat, or collaborative editing features",
+        "Offline-first mobile applications with automatic data sync when connectivity is restored",
+        "Aggregating data from multiple backends (DynamoDB, Lambda, RDS) behind a single GraphQL schema"
+      ]
+    },
+    {
+      "id": "iot-core",
+      "name": "AWS IoT Core",
+      "category": "integration",
+      "description": "Managed IoT broker that connects billions of devices over MQTT, HTTP, and WebSocket with secure, scalable message routing.",
+      "keyUseCases": [
+        "MQTT broker for factory sensors, smart home devices, and connected vehicles",
+        "IoT Rules Engine to route device messages to Kinesis, Lambda, S3, or DynamoDB without code",
+        "Device Shadow for storing and retrieving the last known state of a device when it is offline",
+        "Fleet Indexing for querying device attributes and connectivity status across a large device fleet"
+      ]
+    },
+    {
+      "id": "iam",
+      "name": "AWS IAM",
+      "category": "security",
+      "description": "Identity and access management for controlling who can do what with AWS resources using policies and roles.",
+      "keyUseCases": [
+        "Least-privilege IAM roles for Lambda, EC2, and ECS tasks scoped to only the resources they need",
+        "Cross-account access using role assumption for shared services and centralised logging",
+        "Service control policies (SCPs) in AWS Organisations to enforce guardrails across all accounts",
+        "IAM Identity Centre (SSO) for centralised human access management across multiple AWS accounts"
+      ]
+    },
+    {
+      "id": "cognito",
+      "name": "Amazon Cognito",
+      "category": "security",
+      "description": "Managed user authentication and authorization service supporting JWT tokens, OAuth 2.0, SAML, and social sign-in.",
+      "keyUseCases": [
+        "User pools for application sign-up, sign-in, and JWT token issuance without a custom auth server",
+        "API Gateway JWT authorizer integration for validating tokens at the API layer",
+        "Federated identity for allowing users to sign in with Google, Apple, or corporate SAML IdPs",
+        "Hosted UI for a ready-made sign-in page with no frontend code required"
+      ]
+    },
+    {
+      "id": "kms",
+      "name": "AWS KMS",
+      "category": "security",
+      "description": "Managed key management service for creating and controlling encryption keys used across AWS services.",
+      "keyUseCases": [
+        "Envelope encryption for S3, DynamoDB, RDS, EBS, Kinesis, and Lambda environment variables",
+        "Customer-managed keys (CMKs) for fine-grained control over key rotation and access policies",
+        "Audit key usage via CloudTrail integration — every encrypt/decrypt call is logged",
+        "Cross-account key sharing for decrypting data shared between AWS accounts"
+      ]
+    },
+    {
+      "id": "secrets-manager",
+      "name": "AWS Secrets Manager",
+      "category": "security",
+      "description": "Store, rotate, and retrieve database credentials, API keys, and other secrets with automatic rotation support.",
+      "keyUseCases": [
+        "Database password rotation on a schedule without application downtime (RDS native integration)",
+        "Securely injecting third-party API keys into Lambda environment variables at invocation time",
+        "Centralised secrets management across multiple AWS accounts and regions",
+        "Replacing hard-coded credentials in application configuration with programmatic retrieval"
+      ]
+    },
+    {
+      "id": "waf",
+      "name": "AWS WAF",
+      "category": "security",
+      "description": "Web application firewall that filters malicious HTTP traffic before it reaches your application.",
+      "keyUseCases": [
+        "Blocking common web attacks — SQL injection, cross-site scripting — at the API Gateway or ALB layer",
+        "Rate-based rules to automatically throttle IPs sending excessive requests",
+        "AWS Managed Rules for instant protection against known threat patterns maintained by AWS",
+        "Geo-blocking to restrict API access to specific countries or regions"
+      ]
+    },
+    {
+      "id": "acm",
+      "name": "AWS Certificate Manager",
+      "category": "security",
+      "description": "Provision, manage, and auto-renew TLS certificates for use with AWS services at no cost.",
+      "keyUseCases": [
+        "Free TLS certificates for API Gateway, ALB, and CloudFront without manual renewal",
+        "Wildcard certificates covering all subdomains of a domain in a single certificate",
+        "Private CA for issuing internal certificates for service-to-service mTLS communication",
+        "Certificate transparency logging for auditing all issued certificates"
+      ]
+    },
+    {
+      "id": "vpc",
+      "name": "Amazon VPC",
+      "category": "networking",
+      "description": "Logically isolated virtual network within AWS where you define IP ranges, subnets, routing, and access control.",
+      "keyUseCases": [
+        "Isolating workloads into private subnets inaccessible from the internet",
+        "Security groups as stateful instance-level firewalls for fine-grained traffic control",
+        "VPC endpoints for private connectivity to AWS services without traversing the internet",
+        "VPC peering or Transit Gateway for connecting multiple VPCs across accounts or regions"
+      ]
+    },
+    {
+      "id": "route53",
+      "name": "Amazon Route 53",
+      "category": "networking",
+      "description": "Scalable DNS and traffic routing service with health checks, failover, and latency-based routing.",
+      "keyUseCases": [
+        "Health-check-based failover routing between primary and secondary endpoints or regions",
+        "Latency-based routing to direct users to the closest AWS region for lowest response time",
+        "Weighted routing for canary deployments — gradually shifting traffic to a new version",
+        "Private hosted zones for internal DNS resolution within a VPC"
+      ]
+    },
+    {
+      "id": "global-accelerator",
+      "name": "AWS Global Accelerator",
+      "category": "networking",
+      "description": "Improve availability and performance for global applications by routing traffic through AWS's private backbone network.",
+      "keyUseCases": [
+        "TCP/UDP workloads (gaming, IoT, VoIP) requiring static Anycast IP addresses and network-layer routing",
+        "Instant failover across regions at the network layer — faster than DNS TTL-based failover",
+        "Reducing last-mile latency for global users by entering the AWS backbone as close to them as possible",
+        "Non-HTTP workloads that cannot use CloudFront's application-layer acceleration"
+      ]
+    },
+    {
+      "id": "privatelink",
+      "name": "AWS PrivateLink",
+      "category": "networking",
+      "description": "Expose services to other VPCs or AWS accounts privately without routing traffic over the public internet.",
+      "keyUseCases": [
+        "SaaS providers exposing services to customers' VPCs without VPC peering or internet exposure",
+        "Private access to AWS services (S3, DynamoDB, SQS) from within a VPC without a NAT Gateway",
+        "Cross-account service sharing within an organisation without complex VPC peering mesh",
+        "Compliance requirements prohibiting data from traversing the public internet"
+      ]
+    },
+    {
+      "id": "cloudwatch",
+      "name": "Amazon CloudWatch",
+      "category": "observability",
+      "description": "Unified monitoring and observability service for metrics, logs, alarms, and dashboards across all AWS services.",
+      "keyUseCases": [
+        "Alarms on Lambda error rate, API Gateway 5XX rate, SQS queue depth, and DynamoDB throttles",
+        "Log Insights for ad-hoc querying of structured and unstructured application logs",
+        "Dashboards for operational visibility into the health of a multi-service application",
+        "Container Insights and Lambda Insights for enhanced performance metrics without code changes"
+      ]
+    },
+    {
+      "id": "xray",
+      "name": "AWS X-Ray",
+      "category": "observability",
+      "description": "Distributed tracing service that maps requests as they travel through microservices and AWS managed services.",
+      "keyUseCases": [
+        "Identifying latency bottlenecks across a chain of Lambda, API Gateway, and DynamoDB calls",
+        "Root-cause analysis of intermittent errors in distributed systems",
+        "Sampling rules to capture a representative trace sample without tracing 100% of requests",
+        "Service map visualisation showing dependencies and error rates between services"
+      ]
+    },
+    {
+      "id": "cloudtrail",
+      "name": "AWS CloudTrail",
+      "category": "observability",
+      "description": "Records all API calls made in an AWS account for compliance, security auditing, and operational troubleshooting.",
+      "keyUseCases": [
+        "Audit log of all AWS resource changes — who created, modified, or deleted what and when",
+        "Security incident investigation — trace the exact sequence of API calls during a suspected breach",
+        "Compliance requirements (PCI DSS, SOC 2, HIPAA) requiring an immutable API activity log",
+        "CloudTrail Lake for SQL-based querying of multi-account, multi-region API history"
+      ]
+    },
+    {
+      "id": "config",
+      "name": "AWS Config",
+      "category": "observability",
+      "description": "Continuously records AWS resource configurations and evaluates them against desired-state compliance rules.",
+      "keyUseCases": [
+        "Detecting configuration drift — e.g. a security group that was modified to allow 0.0.0.0/0",
+        "Compliance rules to enforce encryption-at-rest on all EBS volumes or S3 buckets",
+        "Configuration change history for auditing the state of resources over time",
+        "Automatic remediation using Systems Manager Automation when a rule violation is detected"
+      ]
+    },
+    {
+      "id": "kinesis-data-streams",
+      "name": "Amazon Kinesis Data Streams",
+      "category": "analytics",
+      "description": "Real-time data streaming service for ingesting and processing high-throughput data from multiple producers in parallel.",
+      "keyUseCases": [
+        "Real-time event pipelines ingesting application logs, clickstreams, or IoT telemetry at scale",
+        "Multiple independent consumers reading the same stream simultaneously (fan-out pattern)",
+        "Record replay — retain and reprocess events up to 7 days after ingestion",
+        "Low-latency input for Lambda-based real-time anomaly detection or alerting"
+      ]
+    },
+    {
+      "id": "kinesis-firehose",
+      "name": "Amazon Kinesis Data Firehose",
+      "category": "analytics",
+      "description": "Automatically buffers and delivers streaming data to S3, Redshift, OpenSearch, or Splunk without writing delivery code.",
+      "keyUseCases": [
+        "Zero-code delivery of streaming data to S3 for data lake ingestion within 60 seconds",
+        "Automatic format conversion (JSON to Parquet or ORC) and compression before S3 delivery",
+        "Direct streaming delivery to Redshift or OpenSearch without intermediate Lambda consumers",
+        "Enriching records in-flight using a Lambda transform function before delivery"
+      ]
+    },
+    {
+      "id": "glue",
+      "name": "AWS Glue",
+      "category": "analytics",
+      "description": "Serverless ETL service and data catalogue for discovering, transforming, and preparing data for analytics.",
+      "keyUseCases": [
+        "Glue Data Catalog as a central metadata repository for schemas stored in S3 (used by Athena)",
+        "Serverless Spark ETL jobs for large-scale data transformations without managing clusters",
+        "Glue Crawlers for automatically detecting schemas and partitions in S3 data lakes",
+        "Data quality checks and transformations in a visual no-code ETL job editor"
+      ]
+    },
+    {
+      "id": "athena",
+      "name": "Amazon Athena",
+      "category": "analytics",
+      "description": "Serverless SQL query engine for analysing data in S3 using standard SQL — pay per query, no clusters to manage.",
+      "keyUseCases": [
+        "Ad-hoc SQL queries on structured and semi-structured data (CSV, JSON, Parquet) stored in S3",
+        "Log analysis — query VPC Flow Logs, CloudTrail, and ALB access logs stored in S3",
+        "Data exploration before committing to a data warehouse for recurring structured analytics",
+        "Federated queries across S3, DynamoDB, and on-premises data sources in a single SQL statement"
+      ]
+    },
+    {
+      "id": "redshift",
+      "name": "Amazon Redshift",
+      "category": "analytics",
+      "description": "Cloud data warehouse for running complex analytical queries on petabyte-scale structured datasets with columnar storage.",
+      "keyUseCases": [
+        "Business intelligence and dashboarding requiring complex multi-table joins and aggregations",
+        "Redshift Serverless for variable analytical workloads that scale to zero between query bursts",
+        "Data sharing — share live data across Redshift clusters without copying or moving data",
+        "Redshift Spectrum for querying S3 data lake tables alongside Redshift-managed tables in a single query"
+      ]
+    },
+    {
+      "id": "opensearch",
+      "name": "Amazon OpenSearch Service",
+      "category": "analytics",
+      "description": "Managed OpenSearch and Elasticsearch cluster for full-text search, log analytics, and real-time data exploration.",
+      "keyUseCases": [
+        "Full-text search with relevance ranking for product catalogues, document stores, or knowledge bases",
+        "Log aggregation and dashboarding — a managed alternative to self-hosted ELK stacks",
+        "Real-time dashboards for operational data streams (e.g. application metrics, security events)",
+        "Anomaly detection using built-in machine learning on time-series metrics"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "constraints": [
+    {
+      "id": "high-volume",
+      "label": "High Volume",
+      "description": "Must handle large volumes of data or requests at scale, often with burst capacity requirements"
+    },
+    {
+      "id": "pci-compliance",
+      "label": "PCI Compliance",
+      "description": "Must meet PCI DSS requirements for systems that store, process, or transmit payment card data"
+    },
+    {
+      "id": "low-latency",
+      "label": "Low Latency",
+      "description": "Must respond with minimal delay, typically with p99 response times under 100ms"
+    },
+    {
+      "id": "global-accessibility",
+      "label": "Global Accessibility",
+      "description": "Must serve users or devices across multiple continents with acceptable performance"
+    },
+    {
+      "id": "multi-region-resilience",
+      "label": "Multi-Region Resilience",
+      "description": "Must remain operational and available even if an entire AWS region becomes unavailable"
+    },
+    {
+      "id": "cost-sensitivity",
+      "label": "Cost Sensitive",
+      "description": "Must minimise infrastructure spend, particularly important for variable or unpredictable workloads"
+    },
+    {
+      "id": "near-real-time",
+      "label": "Near Real-Time",
+      "description": "Must process and react to data within seconds of ingestion, not minutes or hours"
+    },
+    {
+      "id": "operational-simplicity",
+      "label": "Operational Simplicity",
+      "description": "Must minimise operational overhead, preferring managed services over self-managed infrastructure"
+    }
+  ]
+}
