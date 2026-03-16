@@ -1,0 +1,350 @@
+{
+  "challenges": [
+    {
+      "id": "payments-processing",
+      "title": "Payments Processing",
+      "scenario": "A fintech startup needs to process credit card payments for their e-commerce platform. The system must handle up to 5,000 transactions per second during peak shopping events, provide sub-100ms payment authorization, and log every transaction for a full audit trail. All cardholder data must be handled in a PCI DSS-compliant manner.",
+      "difficulty": "medium",
+      "constraints": ["high-volume", "pci-compliance", "low-latency"],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Think about how to decouple payment intake from downstream processing to absorb burst traffic without data loss. What does your entry point look like, and how do you prevent overloading your processing layer?"
+        },
+        {
+          "tier": 2,
+          "text": "Managed serverless services reduce your PCI DSS attestation surface considerably. Consider which AWS services are already certified under PCI DSS and how you can avoid storing raw card data in your own storage layer."
+        },
+        {
+          "tier": 3,
+          "text": "Use API Gateway + Lambda for the payment intake layer, DynamoDB for transaction state, and SQS for reliable async downstream processing. KMS encrypts sensitive fields at rest and Secrets Manager holds third-party payment gateway credentials."
+        }
+      ],
+      "answer": {
+        "summary": "A serverless payment pipeline uses API Gateway to accept transactions, Lambda for validation and routing, SQS to buffer and decouple downstream processing, and DynamoDB to store transaction state with encryption at rest. This keeps the PCI DSS attestation scope narrow by leveraging AWS-managed PCI-certified services throughout.",
+        "coreServices": [
+          "Amazon API Gateway",
+          "AWS Lambda",
+          "Amazon SQS",
+          "Amazon DynamoDB",
+          "AWS KMS",
+          "AWS Secrets Manager"
+        ],
+        "optionalVariants": [
+          {
+            "title": "Relational Audit Log",
+            "description": "Replace DynamoDB with Amazon Aurora Serverless for complex relational queries across the transaction audit log."
+          },
+          {
+            "title": "Event-Driven Audit Trail",
+            "description": "Add Amazon EventBridge to fan out transaction events to downstream compliance and analytics consumers without coupling them to the payment flow."
+          }
+        ],
+        "tradeoffs": [
+          "Lambda cold starts can add latency on the first request — use provisioned concurrency on the authorization function to guarantee sub-100ms p99.",
+          "DynamoDB's eventually consistent reads are cheaper but can return stale data — use strongly consistent reads for idempotency checks.",
+          "SQS standard queues offer at-least-once delivery — implement idempotent consumers to handle rare duplicate messages safely."
+        ],
+        "resilienceNotes": "SQS dead-letter queues capture any failed transaction messages for reprocessing. DynamoDB point-in-time recovery provides continuous backup. Lambda automatically retries on transient failures. API Gateway is multi-AZ by default.",
+        "securityNotes": "KMS customer-managed keys encrypt all DynamoDB data at rest. Secrets Manager rotates payment gateway API credentials automatically. Lambda functions run in a VPC with no inbound internet access. API Gateway resource policies restrict access to known IP ranges during testing.",
+        "whyItFits": "High Volume: SQS absorbs burst traffic and Lambda scales concurrently without pre-provisioning. PCI Compliance: all services are PCI DSS-certified; card data never touches self-managed infrastructure. Low Latency: provisioned concurrency on Lambda eliminates cold starts; DynamoDB single-digit millisecond reads keep authorization fast."
+      }
+    },
+    {
+      "id": "analytics-ingestion",
+      "title": "Analytics Ingestion",
+      "scenario": "A media streaming company wants to collect real-time user behaviour events — play, pause, seek, and quality changes — from their platform. They expect up to 100,000 events per second at peak and need all data available for SQL-based analysis within 60 seconds of ingestion. The analytics team does not manage servers.",
+      "difficulty": "medium",
+      "constraints": ["high-volume", "near-real-time"],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Think about the difference between streaming and batching for high-volume event ingest. At 100,000 events per second, pulling from a queue is too slow — what pattern lets you process a continuous stream of records in parallel?"
+        },
+        {
+          "tier": 2,
+          "text": "AWS has a managed service purpose-built for ingesting high-throughput real-time data streams. It can fan out to multiple consumers simultaneously, including one that automatically delivers batches to durable storage without writing any code."
+        },
+        {
+          "tier": 3,
+          "text": "Use Kinesis Data Streams for real-time ingest, Kinesis Data Firehose to buffer and deliver to S3 with a 60-second flush interval, Glue Data Catalog to register the schema, and Athena for serverless SQL queries directly on S3."
+        }
+      ],
+      "answer": {
+        "summary": "Events flow from clients into Kinesis Data Streams, which provides durable buffering and parallel consumption. Kinesis Data Firehose automatically batches and delivers events to S3 within 60 seconds. The Glue Data Catalog registers the schema so Athena can run SQL queries directly against S3 without a database cluster.",
+        "coreServices": [
+          "Amazon Kinesis Data Streams",
+          "Amazon Kinesis Data Firehose",
+          "Amazon S3",
+          "AWS Glue Data Catalog",
+          "Amazon Athena"
+        ],
+        "optionalVariants": [
+          {
+            "title": "Interactive Analytics",
+            "description": "Add Amazon Redshift Serverless for complex multi-table joins and persistent dashboards that outperform ad-hoc Athena queries."
+          },
+          {
+            "title": "Search and Exploration",
+            "description": "Add Amazon OpenSearch Service for free-text search and real-time visualisation dashboards alongside the S3-based analytical layer."
+          }
+        ],
+        "tradeoffs": [
+          "Firehose's 60-second buffer satisfies the latency requirement but increases cost if the window is reduced — tune buffer size and interval together.",
+          "Kinesis Data Streams shard capacity requires upfront planning; use enhanced fan-out if multiple consumers need to read the same stream independently.",
+          "Athena query performance depends heavily on S3 partition strategy — partition by date and event type to avoid full-bucket scans."
+        ],
+        "resilienceNotes": "Kinesis Data Streams retains records for 24 hours by default (extendable to 7 days), allowing replay if a consumer fails. Firehose automatically retries S3 delivery on transient failures. S3 provides eleven nines of durability.",
+        "securityNotes": "Enable server-side encryption on the Kinesis stream and S3 bucket using KMS. Restrict Glue Data Catalog access with IAM resource-based policies. Use Athena workgroup settings to enforce query result encryption and cost controls.",
+        "whyItFits": "High Volume: Kinesis Data Streams scales to hundreds of shards to absorb 100,000 events per second. Near Real-Time: Firehose's 60-second delivery window meets the SLA; Glue and Athena make data queryable immediately after each S3 object lands."
+      }
+    },
+    {
+      "id": "event-driven-onboarding",
+      "title": "Event-Driven Employee Onboarding",
+      "scenario": "An HR software company needs to automate their employee onboarding workflow. When HR confirms a new hire, the system must trigger document generation, IT account provisioning, benefits enrolment notification, and a welcome email — all within five minutes. The engineering team is small and wants to avoid managing servers or complex infrastructure.",
+      "difficulty": "easy",
+      "constraints": ["operational-simplicity", "cost-sensitivity"],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Think about how to decouple the triggering event from the downstream processes. If one downstream step fails, the others should not be affected. What pattern separates the trigger from the consumers?"
+        },
+        {
+          "tier": 2,
+          "text": "When multiple independent services need to react to the same business event, a pub/sub or event bus model works well. AWS has a fully managed serverless event bus that requires no infrastructure management and can route events to multiple targets simultaneously."
+        },
+        {
+          "tier": 3,
+          "text": "EventBridge receives the new-hire event and routes it to a Step Functions workflow for orchestration. Each onboarding step (document generation, IT provisioning, benefits enrolment) runs as a separate Lambda function, with SNS or SES handling the welcome notification."
+        }
+      ],
+      "answer": {
+        "summary": "A new-hire confirmation event is published to EventBridge, which routes it to an AWS Step Functions workflow. Step Functions orchestrates the onboarding steps in parallel where possible — document generation, IT provisioning, and benefits enrolment — each implemented as a Lambda function. SES sends the welcome email as the final step.",
+        "coreServices": [
+          "Amazon EventBridge",
+          "AWS Step Functions",
+          "AWS Lambda",
+          "Amazon SQS",
+          "Amazon SES"
+        ],
+        "optionalVariants": [
+          {
+            "title": "State Persistence",
+            "description": "Add DynamoDB to track onboarding progress per employee so HR can view completion status in a lightweight dashboard."
+          },
+          {
+            "title": "Third-Party Webhooks",
+            "description": "Use EventBridge API destinations to trigger third-party HR systems directly without writing a Lambda wrapper."
+          }
+        ],
+        "tradeoffs": [
+          "Step Functions Standard workflows provide a full audit trail and support long-running executions but cost more per state transition than Express workflows.",
+          "Step Functions Express workflows are cheaper and faster for short-lived orchestration but do not guarantee exactly-once execution.",
+          "Using SQS between EventBridge and Lambda adds a small delivery delay but provides a buffer and dead-letter queue for failed steps."
+        ],
+        "resilienceNotes": "Step Functions has built-in retry policies with configurable backoff for each task state. SQS dead-letter queues capture any failed messages for investigation. Lambda automatically retries on transient errors. EventBridge replays failed event deliveries up to 24 hours.",
+        "securityNotes": "Each Lambda function uses a least-privilege IAM role scoped only to the resources it needs. Secrets Manager stores credentials for third-party HR APIs. SES sending identities are verified to prevent spoofing.",
+        "whyItFits": "Operational Simplicity: EventBridge, Step Functions, Lambda, and SES are all fully managed with zero server provisioning or patching. Cost Sensitive: the entire workflow is pay-per-execution — the system costs near zero when no hires are being onboarded."
+      }
+    },
+    {
+      "id": "media-processing",
+      "title": "Video Transcoding Pipeline",
+      "scenario": "A content platform allows creators to upload videos up to 4 GB in size. Each uploaded video must be automatically transcoded into four resolutions (4K, 1080p, 720p, and 480p) for adaptive streaming. Upload volumes spike sharply during daytime and drop to near zero overnight. The company needs to optimise for cost while keeping transcoding latency under 30 minutes per video.",
+      "difficulty": "medium",
+      "constraints": ["high-volume", "cost-sensitivity"],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Think about how object storage events can trigger asynchronous processing without polling. What happens when a video lands in storage — how does the rest of the pipeline know there is work to do?"
+        },
+        {
+          "tier": 2,
+          "text": "AWS has a fully managed service purpose-built for video transcoding at scale that removes the need to manage FFmpeg on EC2. For cost optimisation, consider how a queue between storage and the transcoder lets you absorb upload spikes without over-provisioning."
+        },
+        {
+          "tier": 3,
+          "text": "An S3 upload triggers an SQS message. A Lambda function reads the queue and submits a transcoding job to AWS Elemental MediaConvert with output presets for each resolution. Transcoded outputs are written back to a separate S3 bucket for delivery."
+        }
+      ],
+      "answer": {
+        "summary": "Creators upload videos to an S3 input bucket. An S3 event notification publishes a message to SQS. A Lambda function polls the queue and submits a job to AWS Elemental MediaConvert with four output presets. MediaConvert writes transcoded renditions to an S3 output bucket, and SNS notifies downstream systems when the job completes.",
+        "coreServices": [
+          "Amazon S3",
+          "Amazon SQS",
+          "AWS Lambda",
+          "AWS Elemental MediaConvert",
+          "Amazon SNS"
+        ],
+        "optionalVariants": [
+          {
+            "title": "Custom Transcoding",
+            "description": "Replace MediaConvert with ECS Fargate running a custom FFmpeg container for full control over encoding parameters and codec support."
+          },
+          {
+            "title": "Spot Instance Batch",
+            "description": "Use AWS Batch with Spot Instances for large-volume overnight transcoding where cost matters more than time-to-complete."
+          }
+        ],
+        "tradeoffs": [
+          "MediaConvert pricing is per minute of video output — for very large libraries, EC2 Spot with FFmpeg may be cheaper at the cost of operational complexity.",
+          "SQS visibility timeout must exceed the maximum expected transcoding duration to prevent jobs from being delivered twice.",
+          "S3 Transfer Acceleration can speed up global uploads but adds cost per GB transferred."
+        ],
+        "resilienceNotes": "SQS visibility timeout and message retention prevent job loss if a Lambda invocation fails. MediaConvert automatically retries transient failures. S3 event notifications are at-least-once — Lambda handlers must be idempotent. S3 versioning on the output bucket protects against accidental overwrites.",
+        "securityNotes": "S3 bucket policies block public access on both input and output buckets. IAM roles for Lambda and MediaConvert follow least privilege. Pre-signed S3 URLs are used for secure creator uploads without exposing bucket credentials. KMS encrypts stored video files at rest.",
+        "whyItFits": "High Volume: SQS decouples uploads from transcoding, preventing the pipeline from being overwhelmed during upload spikes. MediaConvert scales to thousands of concurrent jobs without capacity planning. Cost Sensitive: the serverless and managed pipeline charges only for what is used — zero cost overnight when no uploads occur."
+      }
+    },
+    {
+      "id": "global-customer-support",
+      "title": "Global Customer Support Platform",
+      "scenario": "A global SaaS company wants to build a customer support platform that handles voice calls, live chat, and email cases across North America, Europe, and Asia-Pacific. The system must automatically route cases to available agents based on skill and language. It must continue operating even if a single AWS region becomes fully unavailable.",
+      "difficulty": "hard",
+      "constraints": ["global-accessibility", "multi-region-resilience"],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Think about what routing strategies allow the system to automatically fail over to a healthy region without manual intervention. How would customers reach the system if the region they normally connect to goes down?"
+        },
+        {
+          "tier": 2,
+          "text": "AWS has a managed contact centre service that handles voice, chat, and task routing in a single platform without building a telephony stack. For cross-region resilience, think about what makes database replication across regions easy without managing read replicas manually."
+        },
+        {
+          "tier": 3,
+          "text": "Deploy Amazon Connect instances in two regions. Use Route 53 health-check-based failover to redirect inbound traffic to the healthy region. DynamoDB Global Tables replicate agent state and case data across regions automatically with multi-master writes."
+        }
+      ],
+      "answer": {
+        "summary": "Amazon Connect instances are deployed in two AWS regions. Route 53 health checks monitor each region's Connect endpoint and automatically fail over DNS to the healthy region within 60 seconds. DynamoDB Global Tables replicate case records and agent state across both regions with multi-master writes, ensuring agents in both regions always have current data.",
+        "coreServices": [
+          "Amazon Connect",
+          "AWS Lambda",
+          "Amazon DynamoDB Global Tables",
+          "Amazon Route 53",
+          "Amazon SQS",
+          "Amazon SNS"
+        ],
+        "optionalVariants": [
+          {
+            "title": "AI-Powered Chatbot",
+            "description": "Add Amazon Lex to handle common support queries automatically before escalating to a human agent, reducing handle time."
+          },
+          {
+            "title": "Sentiment Analysis",
+            "description": "Stream call transcripts through Amazon Comprehend in real time to detect customer frustration and alert supervisors proactively."
+          }
+        ],
+        "tradeoffs": [
+          "DynamoDB Global Tables use eventual consistency across regions — agents in different regions may briefly see slightly different state during a failover window.",
+          "Amazon Connect contact flows must be independently configured in each region — changes must be deployed to both regions to stay in sync.",
+          "Route 53 DNS TTL must be set low (30–60 seconds) to minimise failover time, which increases DNS query volume and cost slightly."
+        ],
+        "resilienceNotes": "Route 53 health checks detect regional failures within 10–30 seconds and reroute DNS automatically. DynamoDB Global Tables provide active-active replication with automatic conflict resolution. Lambda functions are deployed independently in each region and do not share state between regions.",
+        "securityNotes": "Amazon Connect uses IAM for agent authentication and resource-based policies for instance isolation. Call recordings are encrypted with KMS and stored in S3. HIPAA and PCI eligibility is available on Connect — verify applicable compliance requirements for the use case. VPC endpoints prevent Lambda from traversing the public internet when calling DynamoDB.",
+        "whyItFits": "Global Accessibility: Connect instances in multiple regions reduce latency for agents and callers in each geography. Multi-Region Resilience: Route 53 health-check failover and DynamoDB Global Tables ensure the platform continues operating even if one region is completely unavailable."
+      }
+    },
+    {
+      "id": "iot-telemetry",
+      "title": "IoT Telemetry and Anomaly Detection",
+      "scenario": "A smart manufacturing company operates 50,000 sensors on factory floors worldwide. Each sensor reports temperature, pressure, and vibration readings every five seconds. The system must detect anomalies within 10 seconds of ingestion and immediately alert the maintenance team. Raw sensor data must be retained for 90 days to satisfy compliance requirements.",
+      "difficulty": "hard",
+      "constraints": ["high-volume", "near-real-time"],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "At 50,000 sensors reporting every five seconds, you are handling 10,000 messages per second. Think about what is different about device connectivity compared to API calls — devices use lightweight protocols like MQTT, not HTTP. What AWS service is designed specifically for this?"
+        },
+        {
+          "tier": 2,
+          "text": "AWS IoT Core acts as the managed MQTT broker for device connectivity and supports rule-based routing of ingested messages to other services. Think about how to separate the real-time anomaly detection path from the compliance retention path so neither interferes with the other."
+        },
+        {
+          "tier": 3,
+          "text": "IoT Core ingests device data over MQTT. IoT Rules route messages to Kinesis Data Streams. Lambda reads the stream for anomaly detection and publishes alerts to SNS. A parallel Kinesis Data Firehose path delivers raw data to S3 for 90-day retention with a lifecycle policy."
+        }
+      ],
+      "answer": {
+        "summary": "Devices connect to AWS IoT Core over MQTT. IoT Rules fan out each message to two paths: Kinesis Data Streams for real-time anomaly detection and Kinesis Data Firehose for durable retention in S3. A Lambda function consuming the Kinesis stream applies anomaly detection logic and publishes alerts to SNS, which notifies the maintenance team within 10 seconds.",
+        "coreServices": [
+          "AWS IoT Core",
+          "Amazon Kinesis Data Streams",
+          "Amazon Kinesis Data Firehose",
+          "AWS Lambda",
+          "Amazon SNS",
+          "Amazon S3"
+        ],
+        "optionalVariants": [
+          {
+            "title": "Time-Series Storage",
+            "description": "Replace DynamoDB with Amazon Timestream for native time-series queries, automatic tiered storage, and built-in time-based aggregations without custom indexing."
+          },
+          {
+            "title": "Industrial Monitoring",
+            "description": "Add AWS IoT SiteWise to model the factory asset hierarchy, compute aggregated metrics across equipment groups, and integrate with industrial dashboards."
+          }
+        ],
+        "tradeoffs": [
+          "Kinesis Data Streams shard capacity must be planned for peak throughput — at 10,000 messages per second, shard count and record size determine the required capacity.",
+          "Lambda anomaly detection adds ~100ms per batch — ensure the Kinesis iterator age metric stays low to preserve the 10-second alert SLA.",
+          "IoT Core supports up to 100 messages per second per connection by default — use fleet indexing and batch operations for bulk device management."
+        ],
+        "resilienceNotes": "Kinesis retains records for 24 hours, allowing the anomaly detection Lambda to replay events after a failure. Firehose retries S3 delivery automatically on transient errors. IoT Core is multi-AZ and handles device reconnections transparently. S3 lifecycle policies enforce the 90-day retention window automatically.",
+        "securityNotes": "Each device authenticates to IoT Core using a unique X.509 certificate. IoT policies restrict each device to publishing only on its own topic prefix. KMS encrypts data at rest in Kinesis, S3, and any downstream stores. VPC endpoints prevent Lambda from accessing KMS and S3 over the public internet.",
+        "whyItFits": "High Volume: IoT Core and Kinesis Data Streams are designed for millions of concurrent device connections and thousands of messages per second without capacity pre-provisioning. Near Real-Time: the Kinesis → Lambda path delivers anomaly alerts within 5–10 seconds of sensor data being ingested."
+      }
+    },
+    {
+      "id": "internal-api-platform",
+      "title": "Internal API Platform",
+      "scenario": "A financial services company wants to expose a set of internal microservices as a unified API for their development teams. The API must enforce JWT-based authentication, apply per-consumer rate limiting, and provide auto-generated documentation. Response times must stay under 50ms at the 95th percentile. The operations team wants to avoid managing API infrastructure.",
+      "difficulty": "easy",
+      "constraints": ["low-latency", "operational-simplicity"],
+      "hints": [
+        {
+          "tier": 1,
+          "text": "Think about what AWS provides as a fully managed API platform that handles routing, authentication, and rate limiting without standing up any servers. What reduces the need for a custom authentication service in front of your microservices?"
+        },
+        {
+          "tier": 2,
+          "text": "API Gateway has a built-in concept of usage plans and API keys for per-consumer rate limiting. For JWT validation, think about which authorizer type avoids a Lambda cold start on every request and caches the result of token validation."
+        },
+        {
+          "tier": 3,
+          "text": "Use API Gateway (HTTP API for lowest latency) with a Cognito JWT authorizer for authentication. Lambda proxy integrations back each microservice endpoint. Usage plans enforce per-consumer rate limits. API Gateway automatically generates an OpenAPI spec exportable for documentation."
+        }
+      ],
+      "answer": {
+        "summary": "API Gateway (HTTP API) acts as the unified front door. A Cognito JWT authorizer validates tokens at the edge without invoking a Lambda function, keeping authentication overhead minimal. Lambda proxy integrations route requests to each internal microservice. Usage plans with API keys enforce per-consumer rate limiting, and the built-in OpenAPI export provides auto-generated documentation.",
+        "coreServices": [
+          "Amazon API Gateway (HTTP API)",
+          "Amazon Cognito User Pools",
+          "AWS Lambda",
+          "Amazon CloudWatch",
+          "AWS WAF"
+        ],
+        "optionalVariants": [
+          {
+            "title": "GraphQL Interface",
+            "description": "Replace or supplement API Gateway with AWS AppSync for teams that prefer a GraphQL API with real-time subscription support."
+          },
+          {
+            "title": "Service Mesh",
+            "description": "Add AWS App Mesh for service-to-service communication observability, retries, and circuit breaking between the internal microservices behind the API."
+          }
+        ],
+        "tradeoffs": [
+          "HTTP API is faster and cheaper than REST API but lacks some features — use REST API if you need request/response transformations or AWS service integrations.",
+          "Cognito JWT authorizer caches validation results by token; cache TTL must balance security (short TTL) against latency (longer TTL avoids repeated Cognito calls).",
+          "Lambda cold starts can push p99 latency above 50ms — use provisioned concurrency on latency-sensitive functions or consider direct VPC integrations for services that can accept HTTP directly."
+        ],
+        "resilienceNotes": "API Gateway is multi-AZ and automatically scales with no configuration. Lambda scales concurrently per request. CloudWatch alarms on 5XX error rate and integration latency provide early warning of downstream microservice degradation. WAF rules mitigate common API attack patterns including SQL injection and request flooding.",
+        "securityNotes": "Cognito User Pools issue and validate short-lived JWTs, eliminating the need to manage credentials for API consumers. AWS WAF sits in front of API Gateway to block malicious traffic before it reaches Lambda. Resource policies on the API restrict invocation to known internal IP ranges. CloudWatch Logs capture all API access for audit purposes.",
+        "whyItFits": "Low Latency: HTTP API Gateway has lower overhead than REST API; Cognito JWT authorizer caches validation; provisioned concurrency eliminates Lambda cold starts to keep p95 under 50ms. Operational Simplicity: API Gateway, Cognito, and Lambda are fully managed — no API proxy infrastructure, no auth server, no certificate renewal, no capacity planning."
+      }
+    }
+  ]
+}
