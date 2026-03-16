@@ -5,7 +5,11 @@
       "title": "Payments Processing",
       "scenario": "A fintech startup needs to process credit card payments for their e-commerce platform. The system must handle up to 5,000 transactions per second during peak shopping events, provide sub-100ms payment authorization, and log every transaction for a full audit trail. All cardholder data must be handled in a PCI DSS-compliant manner.",
       "difficulty": "medium",
-      "constraints": ["high-volume", "pci-compliance", "low-latency"],
+      "constraints": [
+        "high-volume",
+        "pci-compliance",
+        "low-latency"
+      ],
       "hints": [
         {
           "tier": 1,
@@ -32,12 +36,12 @@
         ],
         "optionalVariants": [
           {
-            "title": "Relational Audit Log",
-            "description": "Replace DynamoDB with Amazon Aurora Serverless for complex relational queries across the transaction audit log."
+            "title": "SQS FIFO for Ordered Processing",
+            "description": "Replace the standard SQS queue with FIFO to guarantee per-merchant message ordering and exactly-once delivery — at the cost of lower throughput (3,000 TPS cap) and higher price per message."
           },
           {
-            "title": "Event-Driven Audit Trail",
-            "description": "Add Amazon EventBridge to fan out transaction events to downstream compliance and analytics consumers without coupling them to the payment flow."
+            "title": "Aurora Instead of DynamoDB",
+            "description": "Use Amazon Aurora Serverless for transaction storage if your team needs complex SQL queries across the audit trail; provides relational structure but is harder to scale under sudden burst traffic."
           }
         ],
         "tradeoffs": [
@@ -55,7 +59,10 @@
       "title": "Analytics Ingestion",
       "scenario": "A media streaming company wants to collect real-time user behaviour events — play, pause, seek, and quality changes — from their platform. They expect up to 100,000 events per second at peak and need all data available for SQL-based analysis within 60 seconds of ingestion. The analytics team does not manage servers.",
       "difficulty": "medium",
-      "constraints": ["high-volume", "near-real-time"],
+      "constraints": [
+        "high-volume",
+        "near-real-time"
+      ],
       "hints": [
         {
           "tier": 1,
@@ -81,12 +88,12 @@
         ],
         "optionalVariants": [
           {
-            "title": "Interactive Analytics",
-            "description": "Add Amazon Redshift Serverless for complex multi-table joins and persistent dashboards that outperform ad-hoc Athena queries."
+            "title": "Amazon MSK Instead of Kinesis",
+            "description": "Use Amazon Managed Streaming for Apache Kafka (MSK) in place of Kinesis Data Streams if your team already knows Kafka; supports more consumer groups but requires more operational configuration."
           },
           {
-            "title": "Search and Exploration",
-            "description": "Add Amazon OpenSearch Service for free-text search and real-time visualisation dashboards alongside the S3-based analytical layer."
+            "title": "Lambda Consumer Without Firehose",
+            "description": "Attach a Lambda function to the Kinesis stream to transform and write records directly to S3 without Firehose; gives full control over partitioning and format but requires writing and maintaining delivery code."
           }
         ],
         "tradeoffs": [
@@ -104,7 +111,10 @@
       "title": "Event-Driven Employee Onboarding",
       "scenario": "An HR software company needs to automate their employee onboarding workflow. When HR confirms a new hire, the system must trigger document generation, IT account provisioning, benefits enrolment notification, and a welcome email — all within five minutes. The engineering team is small and wants to avoid managing servers or complex infrastructure.",
       "difficulty": "easy",
-      "constraints": ["operational-simplicity", "cost-sensitivity"],
+      "constraints": [
+        "operational-simplicity",
+        "cost-sensitivity"
+      ],
       "hints": [
         {
           "tier": 1,
@@ -130,12 +140,12 @@
         ],
         "optionalVariants": [
           {
-            "title": "State Persistence",
-            "description": "Add DynamoDB to track onboarding progress per employee so HR can view completion status in a lightweight dashboard."
+            "title": "SNS Fan-Out Without EventBridge",
+            "description": "Publish the new-hire event directly to SNS and fan out to separate SQS queues per step; simpler and slightly cheaper than EventBridge, but loses content-based routing rules and event schema validation."
           },
           {
-            "title": "Third-Party Webhooks",
-            "description": "Use EventBridge API destinations to trigger third-party HR systems directly without writing a Lambda wrapper."
+            "title": "Step Functions Express Workflow",
+            "description": "Use Step Functions Express Workflows instead of Standard for lower cost per execution; Express does not guarantee exactly-once execution, so each Lambda step must be idempotent to handle rare duplicates safely."
           }
         ],
         "tradeoffs": [
@@ -153,7 +163,10 @@
       "title": "Video Transcoding Pipeline",
       "scenario": "A content platform allows creators to upload videos up to 4 GB in size. Each uploaded video must be automatically transcoded into four resolutions (4K, 1080p, 720p, and 480p) for adaptive streaming. Upload volumes spike sharply during daytime and drop to near zero overnight. The company needs to optimise for cost while keeping transcoding latency under 30 minutes per video.",
       "difficulty": "medium",
-      "constraints": ["high-volume", "cost-sensitivity"],
+      "constraints": [
+        "high-volume",
+        "cost-sensitivity"
+      ],
       "hints": [
         {
           "tier": 1,
@@ -179,12 +192,12 @@
         ],
         "optionalVariants": [
           {
-            "title": "Custom Transcoding",
-            "description": "Replace MediaConvert with ECS Fargate running a custom FFmpeg container for full control over encoding parameters and codec support."
+            "title": "ECS Fargate with Custom FFmpeg",
+            "description": "Replace MediaConvert with ECS Fargate running a custom FFmpeg container for fine-grained codec and filter control; adds ongoing container maintenance overhead and requires FFmpeg expertise."
           },
           {
-            "title": "Spot Instance Batch",
-            "description": "Use AWS Batch with Spot Instances for large-volume overnight transcoding where cost matters more than time-to-complete."
+            "title": "AWS Batch with Spot Instances",
+            "description": "Route overnight transcoding jobs to AWS Batch using Spot Instances for up to 70% cost reduction; Spot interruptions can delay jobs, so set a maximum wait time and fall back to On-Demand when deadlines are firm."
           }
         ],
         "tradeoffs": [
@@ -202,7 +215,10 @@
       "title": "Global Customer Support Platform",
       "scenario": "A global SaaS company wants to build a customer support platform that handles voice calls, live chat, and email cases across North America, Europe, and Asia-Pacific. The system must automatically route cases to available agents based on skill and language. It must continue operating even if a single AWS region becomes fully unavailable.",
       "difficulty": "hard",
-      "constraints": ["global-accessibility", "multi-region-resilience"],
+      "constraints": [
+        "global-accessibility",
+        "multi-region-resilience"
+      ],
       "hints": [
         {
           "tier": 1,
@@ -222,19 +238,19 @@
         "coreServices": [
           "Amazon Connect",
           "AWS Lambda",
-          "Amazon DynamoDB Global Tables",
+          "Amazon DynamoDB",
           "Amazon Route 53",
           "Amazon SQS",
           "Amazon SNS"
         ],
         "optionalVariants": [
           {
-            "title": "AI-Powered Chatbot",
-            "description": "Add Amazon Lex to handle common support queries automatically before escalating to a human agent, reducing handle time."
+            "title": "Pilot Light Standby Region",
+            "description": "Run a minimal standby Connect instance in a second region and promote it manually during a regional outage; cheaper than active-active but requires human intervention and accepts a few minutes of downtime."
           },
           {
-            "title": "Sentiment Analysis",
-            "description": "Stream call transcripts through Amazon Comprehend in real time to detect customer frustration and alert supervisors proactively."
+            "title": "Third-Party Contact Centre on AWS",
+            "description": "Deploy Genesys, NICE CXone, or Cisco Webex on EC2 or ECS if your team already operates those platforms; preserves existing agent workflows but shifts infrastructure management and patching back to your team."
           }
         ],
         "tradeoffs": [
@@ -252,7 +268,10 @@
       "title": "IoT Telemetry and Anomaly Detection",
       "scenario": "A smart manufacturing company operates 50,000 sensors on factory floors worldwide. Each sensor reports temperature, pressure, and vibration readings every five seconds. The system must detect anomalies within 10 seconds of ingestion and immediately alert the maintenance team. Raw sensor data must be retained for 90 days to satisfy compliance requirements.",
       "difficulty": "hard",
-      "constraints": ["high-volume", "near-real-time"],
+      "constraints": [
+        "high-volume",
+        "near-real-time"
+      ],
       "hints": [
         {
           "tier": 1,
@@ -279,12 +298,12 @@
         ],
         "optionalVariants": [
           {
-            "title": "Time-Series Storage",
-            "description": "Replace DynamoDB with Amazon Timestream for native time-series queries, automatic tiered storage, and built-in time-based aggregations without custom indexing."
+            "title": "Amazon Timestream Instead of DynamoDB",
+            "description": "Replace DynamoDB with Amazon Timestream for native time-series queries and automatic hot-to-cold data tiering; reduces index complexity but adds a service to learn if your team is unfamiliar with time-series databases."
           },
           {
-            "title": "Industrial Monitoring",
-            "description": "Add AWS IoT SiteWise to model the factory asset hierarchy, compute aggregated metrics across equipment groups, and integrate with industrial dashboards."
+            "title": "SQS Instead of Kinesis",
+            "description": "Route IoT Core messages to SQS instead of Kinesis Data Streams for simpler queue-based processing; easier to operate but cannot replay messages after a failure and has a lower throughput ceiling."
           }
         ],
         "tradeoffs": [
@@ -302,7 +321,10 @@
       "title": "Internal API Platform",
       "scenario": "A financial services company wants to expose a set of internal microservices as a unified API for their development teams. The API must enforce JWT-based authentication, apply per-consumer rate limiting, and provide auto-generated documentation. Response times must stay under 50ms at the 95th percentile. The operations team wants to avoid managing API infrastructure.",
       "difficulty": "easy",
-      "constraints": ["low-latency", "operational-simplicity"],
+      "constraints": [
+        "low-latency",
+        "operational-simplicity"
+      ],
       "hints": [
         {
           "tier": 1,
@@ -320,20 +342,20 @@
       "answer": {
         "summary": "API Gateway (HTTP API) acts as the unified front door. A Cognito JWT authorizer validates tokens at the edge without invoking a Lambda function, keeping authentication overhead minimal. Lambda proxy integrations route requests to each internal microservice. Usage plans with API keys enforce per-consumer rate limiting, and the built-in OpenAPI export provides auto-generated documentation.",
         "coreServices": [
-          "Amazon API Gateway (HTTP API)",
-          "Amazon Cognito User Pools",
+          "Amazon API Gateway",
+          "Amazon Cognito",
           "AWS Lambda",
           "Amazon CloudWatch",
           "AWS WAF"
         ],
         "optionalVariants": [
           {
-            "title": "GraphQL Interface",
-            "description": "Replace or supplement API Gateway with AWS AppSync for teams that prefer a GraphQL API with real-time subscription support."
+            "title": "REST API Gateway for Richer Features",
+            "description": "Use REST API Gateway instead of HTTP API to get built-in request validation, response transformation, and per-method caching; adds 10–15 ms of latency and costs roughly 3× more per million requests."
           },
           {
-            "title": "Service Mesh",
-            "description": "Add AWS App Mesh for service-to-service communication observability, retries, and circuit breaking between the internal microservices behind the API."
+            "title": "AWS AppSync for GraphQL Teams",
+            "description": "Replace API Gateway with AppSync if development teams prefer a GraphQL schema and want real-time subscriptions; adds complexity for teams unfamiliar with GraphQL resolvers and schema design."
           }
         ],
         "tradeoffs": [
@@ -343,7 +365,7 @@
         ],
         "resilienceNotes": "API Gateway is multi-AZ and automatically scales with no configuration. Lambda scales concurrently per request. CloudWatch alarms on 5XX error rate and integration latency provide early warning of downstream microservice degradation. WAF rules mitigate common API attack patterns including SQL injection and request flooding.",
         "securityNotes": "Cognito User Pools issue and validate short-lived JWTs, eliminating the need to manage credentials for API consumers. AWS WAF sits in front of API Gateway to block malicious traffic before it reaches Lambda. Resource policies on the API restrict invocation to known internal IP ranges. CloudWatch Logs capture all API access for audit purposes.",
-        "whyItFits": "Low Latency: HTTP API Gateway has lower overhead than REST API; Cognito JWT authorizer caches validation; provisioned concurrency eliminates Lambda cold starts to keep p95 under 50ms. Operational Simplicity: API Gateway, Cognito, and Lambda are fully managed — no API proxy infrastructure, no auth server, no certificate renewal, no capacity planning."
+        "whyItFits": "Low Latency: HTTP API Gateway has lower overhead than REST API; Cognito JWT validation happens at the edge before Lambda is invoked. Operational Simplicity: API Gateway, Cognito, Lambda, and CloudWatch are all fully managed — zero servers, zero patching, and zero custom authorisation code."
       }
     }
   ]

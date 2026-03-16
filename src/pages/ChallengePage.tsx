@@ -285,8 +285,9 @@ export default function ChallengePage({
             {activeTab === "hints" && (
               <section aria-label="Hints">
                 <p className="text-xs text-gray-400 mb-3 leading-relaxed">
-                  Hints are revealed one tier at a time. Use them only when you
-                  need a nudge — earlier tiers keep the challenge fresh.
+                  Hints are revealed one tier at a time. Earlier tiers keep more
+                  of the design decision yours — only go deeper when you're
+                  stuck.
                 </p>
                 <HintPanel
                   hints={card.hints}

@@ -86,9 +86,9 @@ export default function AnswerPanel({ answer }: AnswerPanelProps) {
         </div>
       </AccordionSection>
 
-      {/* Optional Variants */}
+      {/* Alternative Approaches */}
       {answer.optionalVariants.length > 0 && (
-        <AccordionSection label="Optional Variants">
+        <AccordionSection label="Alternative Approaches">
           <div className="space-y-3">
             {answer.optionalVariants.map((v) => (
               <div key={v.title}>

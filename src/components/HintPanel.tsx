@@ -13,9 +13,9 @@
 import type { Hint, HintTier } from "@content/schema/types";
 
 const HINT_TIMING: Record<HintTier, string> = {
-  1: "Available from the start",
-  2: "Suggested after ~3 min",
-  3: "Suggested after ~6 min",
+  1: "Conceptual — available now",
+  2: "Directional — after ~3 min",
+  3: "Near-explicit — after ~6 min",
 };
 
 interface HintPanelProps {

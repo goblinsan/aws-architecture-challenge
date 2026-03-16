@@ -69,6 +69,8 @@ export const SERVICE_ICONS: Record<string, AwsIconConfig> = {
   "api-gateway":        { abbr: "APIG", color: "#E7157B", textColor: "#fff" },
   appsync:              { abbr: "AS",   color: "#E7157B", textColor: "#fff" },
   "iot-core":           { abbr: "IoT",  color: "#E7157B", textColor: "#fff" },
+  connect:              { abbr: "CC",   color: "#E7157B", textColor: "#fff" },
+  ses:                  { abbr: "SES",  color: "#E7157B", textColor: "#fff" },
 
   // Security
   iam:                  { abbr: "IAM",  color: "#DD344C", textColor: "#fff" },
@@ -124,6 +126,7 @@ export const SERVICE_NAME_TO_ID: Record<string, string> = {
 
   // Databases
   "amazon dynamodb":                    "dynamodb",
+  "amazon dynamodb global tables":      "dynamodb",
   "amazon aurora":                      "aurora",
   "amazon elasticache":                 "elasticache",
   "amazon timestream":                  "timestream",
@@ -135,12 +138,18 @@ export const SERVICE_NAME_TO_ID: Record<string, string> = {
   "amazon eventbridge":                 "eventbridge",
   "aws step functions":                 "step-functions",
   "amazon api gateway":                 "api-gateway",
+  "amazon api gateway (http api)":      "api-gateway",
+  "amazon api gateway (rest api)":      "api-gateway",
   "aws appsync":                        "appsync",
   "aws iot core":                       "iot-core",
+  "amazon connect":                     "connect",
+  "amazon ses":                         "ses",
+  "amazon simple email service":        "ses",
 
   // Security
   "aws iam":                            "iam",
   "amazon cognito":                     "cognito",
+  "amazon cognito user pools":          "cognito",
   "aws kms":                            "kms",
   "aws secrets manager":                "secrets-manager",
   "aws waf":                            "waf",
